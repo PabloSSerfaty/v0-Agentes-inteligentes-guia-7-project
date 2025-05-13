@@ -5,7 +5,6 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { CAUSAS_UNIFICADAS, ACCIONES_RECOMENDADAS } from "@/lib/constants"
 import { Card } from "@/components/ui/card"
 import { ZoomIn, ZoomOut, RefreshCw } from "lucide-react"
 
@@ -19,100 +18,167 @@ interface DecisionNode {
   actions?: string[]
 }
 
-// Estructura del árbol de decisión
+// Estructura del árbol de decisión actualizada según la imagen proporcionada
 const decisionTree: DecisionNode[] = [
   {
     id: "start",
     type: "start",
     text: "Inicio del Diagnóstico",
-    children: [{ condition: "Continuar", probability: 1.0, nodeId: "internet" }],
+    children: [{ condition: "Continuar", probability: 1.0, nodeId: "hay_conexion" }],
   },
   {
-    id: "internet",
+    id: "hay_conexion",
     type: "decision",
-    text: "¿Sin conexión a Internet?",
+    text: "¿Hay conexión a Internet?",
     children: [
-      { condition: "Sí", probability: 0.65, nodeId: "wifi_signal" },
-      { condition: "No", probability: 0.35, nodeId: "intermittent" },
+      { condition: "No", probability: 0.5, nodeId: "ping_falla" },
+      { condition: "Sí", probability: 0.5, nodeId: "conexion_intermitente" },
+    ],
+  },
+  // Rama: No hay conexión a Internet
+  {
+    id: "ping_falla",
+    type: "decision",
+    text: "¿Ping falla?",
+    children: [
+      { condition: "Sí", probability: 0.6, nodeId: "reiniciar_router" },
+      { condition: "No", probability: 0.4, nodeId: "revisar_config_ip" },
     ],
   },
   {
-    id: "wifi_signal",
-    type: "decision",
-    text: "¿Señal Wi-Fi débil?",
-    children: [
-      { condition: "Sí", probability: 0.32, nodeId: "wifi_interference" },
-      { condition: "No", probability: 0.68, nodeId: "dns_errors" },
-    ],
-  },
-  {
-    id: "dns_errors",
-    type: "decision",
-    text: "¿Errores DNS?",
-    children: [
-      { condition: "Sí", probability: 0.45, nodeId: "dns_config" },
-      { condition: "No", probability: 0.55, nodeId: "router_failure" },
-    ],
-  },
-  {
-    id: "intermittent",
-    type: "decision",
-    text: "¿Conexión intermitente?",
-    children: [
-      { condition: "Sí", probability: 0.58, nodeId: "hardware_issues" },
-      { condition: "No", probability: 0.42, nodeId: "slow_loading" },
-    ],
-  },
-  {
-    id: "slow_loading",
-    type: "decision",
-    text: "¿Carga lenta de páginas?",
-    children: [
-      { condition: "Sí", probability: 0.75, nodeId: "congestion" },
-      { condition: "No", probability: 0.25, nodeId: "isp_problems" },
-    ],
-  },
-  {
-    id: "wifi_interference",
+    id: "reiniciar_router",
     type: "result",
-    text: CAUSAS_UNIFICADAS.WIFI_INTERFERENCE,
+    text: "Reiniciar router",
+    probability: 0.9,
+    actions: [
+      "Apagar el router durante 30 segundos",
+      "Encender el router y esperar a que se inicialice",
+      "Verificar si se restablece la conexión",
+    ],
+  },
+  {
+    id: "revisar_config_ip",
+    type: "result",
+    text: "Revisar configuración IP",
     probability: 0.85,
-    actions: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.WIFI_INTERFERENCE],
+    actions: [
+      "Verificar que la configuración IP sea correcta",
+      "Comprobar que el DHCP esté habilitado o la IP estática sea válida",
+      "Verificar la máscara de subred y la puerta de enlace",
+    ],
+  },
+  // Rama: Hay conexión pero es intermitente
+  {
+    id: "conexion_intermitente",
+    type: "decision",
+    text: "¿Conexión lenta o intermitente?",
+    children: [
+      { condition: "Sí", probability: 0.7, nodeId: "wifi_o_cable" },
+      { condition: "No", probability: 0.3, nodeId: "carga_lento_servidor" },
+    ],
   },
   {
-    id: "dns_config",
-    type: "result",
-    text: CAUSAS_UNIFICADAS.DNS_CONFIG,
-    probability: 0.78,
-    actions: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.DNS_CONFIG],
+    id: "wifi_o_cable",
+    type: "decision",
+    text: "¿WiFi o cable?",
+    children: [
+      { condition: "WiFi", probability: 0.6, nodeId: "default_route" },
+      { condition: "Cable", probability: 0.4, nodeId: "cable_danado" },
+    ],
   },
   {
-    id: "router_failure",
+    id: "default_route",
     type: "result",
-    text: CAUSAS_UNIFICADAS.ROUTER_FAILURE,
-    probability: 0.65,
-    actions: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.ROUTER_FAILURE],
+    text: "Default route",
+    probability: 0.75,
+    actions: [
+      "Verificar la configuración de la ruta por defecto",
+      "Comprobar la tabla de enrutamiento",
+      "Revisar la configuración del gateway",
+    ],
   },
   {
-    id: "hardware_issues",
+    id: "cable_danado",
     type: "result",
-    text: CAUSAS_UNIFICADAS.NETWORK_HARDWARE,
-    probability: 0.72,
-    actions: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.NETWORK_HARDWARE],
+    text: "Cable dañado",
+    probability: 0.8,
+    actions: [
+      "Inspeccionar visualmente el cable en busca de daños",
+      "Reemplazar el cable de red",
+      "Verificar los conectores RJ45",
+    ],
+  },
+  // Rama: Hay conexión pero hay problemas
+  {
+    id: "carga_lento_servidor",
+    type: "decision",
+    text: "¿Carga lento el servidor interno?",
+    children: [
+      { condition: "Sí", probability: 0.65, nodeId: "ver_tablas_recursos" },
+      { condition: "No", probability: 0.35, nodeId: "utiliza_dns_cable" },
+    ],
   },
   {
-    id: "congestion",
-    type: "result",
-    text: CAUSAS_UNIFICADAS.NETWORK_CONGESTION,
-    probability: 0.68,
-    actions: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.NETWORK_CONGESTION],
+    id: "ver_tablas_recursos",
+    type: "decision",
+    text: "Ver tablas y recursos del servidor",
+    children: [
+      { condition: "Problema identificado", probability: 0.7, nodeId: "controlar_procesos" },
+      { condition: "Sin problemas", probability: 0.3, nodeId: "revisar_estado_red" },
+    ],
   },
   {
-    id: "isp_problems",
+    id: "controlar_procesos",
     type: "result",
-    text: CAUSAS_UNIFICADAS.ISP_PROBLEMS,
-    probability: 0.55,
-    actions: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.ISP_PROBLEMS],
+    text: "Controlar el proceso",
+    probability: 0.85,
+    actions: [
+      "Identificar los procesos que consumen más recursos",
+      "Limitar o detener procesos problemáticos",
+      "Optimizar la configuración del servidor",
+    ],
+  },
+  {
+    id: "revisar_estado_red",
+    type: "result",
+    text: "Revisar estado general de red interna",
+    probability: 0.7,
+    actions: [
+      "Verificar el estado de los switches y routers internos",
+      "Comprobar la carga de la red",
+      "Revisar la configuración de QoS",
+    ],
+  },
+  {
+    id: "utiliza_dns_cable",
+    type: "decision",
+    text: "¿Utiliza DNS o cable con ISP?",
+    children: [
+      { condition: "DNS", probability: 0.55, nodeId: "cambiar_servidor_dns" },
+      { condition: "Cable", probability: 0.45, nodeId: "revisar_mantenimiento" },
+    ],
+  },
+  {
+    id: "cambiar_servidor_dns",
+    type: "result",
+    text: "Cambiar servidor DNS",
+    probability: 0.8,
+    actions: [
+      "Configurar servidores DNS alternativos (8.8.8.8, 1.1.1.1)",
+      "Limpiar la caché DNS",
+      "Verificar que los nuevos servidores DNS funcionen correctamente",
+    ],
+  },
+  {
+    id: "revisar_mantenimiento",
+    type: "result",
+    text: "Revisar mantenimiento del ISP",
+    probability: 0.75,
+    actions: [
+      "Contactar al proveedor de servicios",
+      "Verificar si hay mantenimientos programados",
+      "Consultar el estado del servicio en la página del ISP",
+    ],
   },
 ]
 
@@ -243,7 +309,7 @@ export function DecisionTreeDiagram({
                   </div>
                   <div className="flex items-center">
                     <div className="w-4 h-4 rounded-sm bg-[#6AA84F] mr-2"></div>
-                    <span className="text-sm">Diagnóstico final</span>
+                    <span className="text-sm">Acción recomendada</span>
                   </div>
                 </div>
                 <div>
@@ -292,28 +358,28 @@ export function DecisionTreeDiagram({
                   <h5 className="font-medium mt-4 mb-2">Regla de Decisión:</h5>
                   <div className="text-sm p-3 bg-gray-100 rounded-md font-mono">
                     SI [Síntoma = {getDecisionPath(decisionTree, selectedNode.id).join("] Y [")}] ENTONCES [
-                    {selectedNode.text}] (confianza: {(selectedNode.probability || 0) * 100}%)
+                    {selectedNode.text}]
                   </div>
                 </div>
               ) : (
                 <div>
                   <p className="text-sm text-gray-600 mb-4">
-                    Selecciona un nodo de diagnóstico final para ver sus detalles y acciones recomendadas.
+                    Selecciona un nodo de acción recomendada para ver sus detalles.
                   </p>
 
                   <h4 className="font-medium mb-2">Sobre el Árbol de Decisión</h4>
                   <p className="text-sm text-gray-600 mb-4">
                     Este árbol representa el proceso de diagnóstico mediante reglas SI-ENTONCES. Cada diamante es una
-                    pregunta sobre un síntoma, y las respuestas conducen a diferentes ramas hasta llegar a un
-                    diagnóstico final.
+                    pregunta sobre un síntoma, y las respuestas conducen a diferentes ramas hasta llegar a una acción
+                    recomendada.
                   </p>
 
                   <h4 className="font-medium mb-2">Cómo Interpretar</h4>
                   <ul className="text-sm text-gray-600 space-y-2">
                     <li>• Los diamantes amarillos representan preguntas sobre síntomas</li>
-                    <li>• Los rectángulos verdes son diagnósticos finales con acciones recomendadas</li>
+                    <li>• Los rectángulos verdes son acciones recomendadas</li>
                     <li>• El grosor de las líneas indica la probabilidad de esa transición</li>
-                    <li>• Haz clic en un diagnóstico final para ver la regla completa</li>
+                    <li>• Haz clic en una acción recomendada para ver la regla completa</li>
                   </ul>
                 </div>
               )}
@@ -439,7 +505,9 @@ function DecisionTreeGraph({
     const newZoom = Math.max(0.5, Math.min(3, zoomLevel + delta))
 
     // Actualizar el zoom
-    setZoomLevel(newZoom)
+    if (typeof setZoomLevel === "function") {
+      setZoomLevel(newZoom)
+    }
   }
 
   useEffect(() => {

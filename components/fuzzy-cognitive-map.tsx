@@ -1,112 +1,260 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Card } from "@/components/ui/card"
-import { ZoomIn, ZoomOut, RefreshCw } from "lucide-react"
+import { ZoomIn, ZoomOut, RefreshCw, Download, Maximize2, Filter } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Definición de tipos para el mapa cognitivo difuso
 interface FCMNode {
   id: string
-  name: string
-  type: "input" | "output" | "cause"
-  x?: number
-  y?: number
+  label: string
+  type: "sintoma" | "causa" | "factor"
+  value?: number
+  description?: string
 }
 
-interface FCMRelation {
+interface FCMEdge {
   source: string
   target: string
-  weight: number // Peso entre -1 y 1
+  weight: number
+  description?: string
 }
 
 interface FCMData {
   nodes: FCMNode[]
-  relations: FCMRelation[]
+  edges: FCMEdge[]
 }
 
-// Datos del mapa cognitivo difuso para el sistema de diagnóstico de red
+// Datos para el mapa cognitivo difuso
 const fcmData: FCMData = {
   nodes: [
-    // Variables lingüísticas de entrada (criterios evaluativos)
-    { id: "velocidad", name: "Velocidad de Conexión", type: "input" },
-    { id: "estabilidad", name: "Estabilidad de Conexión", type: "input" },
-    { id: "intensidad_wifi", name: "Intensidad WiFi", type: "input" },
-    { id: "latencia", name: "Latencia", type: "input" },
-    { id: "acceso", name: "Acceso a Servicios", type: "input" },
+    // Síntomas
+    {
+      id: "conexion",
+      label: "Estado de conexión",
+      type: "sintoma",
+      description: "Estabilidad general de la conexión a Internet",
+    },
+    { id: "velocidad", label: "Velocidad de carga", type: "sintoma", description: "Velocidad de descarga de datos" },
+    {
+      id: "perdida_paquetes",
+      label: "Pérdida de paquetes",
+      type: "sintoma",
+      description: "Porcentaje de paquetes perdidos durante la transmisión",
+    },
+    {
+      id: "errores_dns",
+      label: "Errores DNS",
+      type: "sintoma",
+      description: "Frecuencia de errores de resolución de nombres de dominio",
+    },
+    { id: "senal_wifi", label: "Señal Wi-Fi", type: "sintoma", description: "Intensidad de la señal inalámbrica" },
+    {
+      id: "tiempo_carga",
+      label: "Tiempo de carga",
+      type: "sintoma",
+      description: "Tiempo promedio de carga de páginas web",
+    },
+    {
+      id: "latencia_servidor",
+      label: "Latencia del servidor",
+      type: "sintoma",
+      description: "Tiempo de respuesta del servidor interno",
+    },
 
-    // Causas potenciales (salidas del sistema difuso)
-    { id: "congestion", name: "Congestión de Red", type: "cause" },
-    { id: "fallo_router", name: "Fallo del Router", type: "cause" },
-    { id: "interferencia", name: "Interferencia WiFi", type: "cause" },
-    { id: "config_incorrecta", name: "Config. Incorrecta DNS", type: "cause" },
-    { id: "fallo_infraestructura", name: "Fallo Infraestructura", type: "cause" },
+    // Factores intermedios
+    {
+      id: "calidad_conexion",
+      label: "Calidad de conexión",
+      type: "factor",
+      description: "Factor que representa la calidad general de la conexión",
+    },
+    {
+      id: "rendimiento_red",
+      label: "Rendimiento de red",
+      type: "factor",
+      description: "Factor que representa el rendimiento general de la red",
+    },
+    {
+      id: "configuracion_red",
+      label: "Configuración de red",
+      type: "factor",
+      description: "Factor que representa la correcta configuración de la red",
+    },
+
+    // Causas
+    {
+      id: "router_failure",
+      label: "Fallo del router",
+      type: "causa",
+      description: "Problemas con el hardware o software del router",
+    },
+    {
+      id: "isp_problems",
+      label: "Problemas del ISP",
+      type: "causa",
+      description: "Problemas en la infraestructura del proveedor de servicios",
+    },
+    {
+      id: "network_hardware",
+      label: "Hardware de red",
+      type: "causa",
+      description: "Fallos en dispositivos de red como switches o tarjetas",
+    },
+    {
+      id: "dns_config",
+      label: "Configuración DNS",
+      type: "causa",
+      description: "Configuración incorrecta de los servidores DNS",
+    },
+    {
+      id: "wifi_interference",
+      label: "Interferencia WiFi",
+      type: "causa",
+      description: "Interferencias que afectan a la calidad de la señal WiFi",
+    },
+    {
+      id: "server_overload",
+      label: "Sobrecarga del servidor",
+      type: "causa",
+      description: "El servidor no puede manejar la cantidad de solicitudes",
+    },
+    {
+      id: "network_congestion",
+      label: "Congestión de red",
+      type: "causa",
+      description: "Saturación de la red debido a alto volumen de tráfico",
+    },
   ],
-  relations: [
-    // Relaciones de velocidad
-    { source: "velocidad", target: "congestion", weight: -0.8 },
-    { source: "velocidad", target: "fallo_router", weight: -0.6 },
-    { source: "velocidad", target: "config_incorrecta", weight: -0.5 },
+  edges: [
+    // Conexiones de síntomas a factores
+    {
+      source: "conexion",
+      target: "calidad_conexion",
+      weight: 0.9,
+      description: "El estado de conexión afecta directamente a la calidad de conexión",
+    },
+    {
+      source: "velocidad",
+      target: "rendimiento_red",
+      weight: 0.8,
+      description: "La velocidad de carga es un indicador clave del rendimiento de red",
+    },
+    {
+      source: "perdida_paquetes",
+      target: "rendimiento_red",
+      weight: 0.7,
+      description: "La pérdida de paquetes reduce el rendimiento de la red",
+    },
+    {
+      source: "errores_dns",
+      target: "configuracion_red",
+      weight: 0.85,
+      description: "Los errores DNS indican problemas de configuración",
+    },
+    {
+      source: "senal_wifi",
+      target: "calidad_conexion",
+      weight: 0.75,
+      description: "La señal WiFi afecta a la calidad de la conexión inalámbrica",
+    },
+    {
+      source: "tiempo_carga",
+      target: "rendimiento_red",
+      weight: 0.8,
+      description: "El tiempo de carga refleja el rendimiento de la red",
+    },
+    {
+      source: "latencia_servidor",
+      target: "rendimiento_red",
+      weight: 0.7,
+      description: "La latencia del servidor afecta al rendimiento percibido",
+    },
 
-    // Relaciones de estabilidad
-    { source: "estabilidad", target: "fallo_router", weight: -0.7 },
-    { source: "estabilidad", target: "interferencia", weight: -0.8 },
-    { source: "estabilidad", target: "fallo_infraestructura", weight: -0.6 },
+    // Conexiones de factores a causas
+    {
+      source: "calidad_conexion",
+      target: "router_failure",
+      weight: 0.7,
+      description: "Una mala calidad de conexión puede indicar fallos en el router",
+    },
+    {
+      source: "calidad_conexion",
+      target: "isp_problems",
+      weight: 0.65,
+      description: "Problemas de calidad pueden originarse en el ISP",
+    },
+    {
+      source: "calidad_conexion",
+      target: "wifi_interference",
+      weight: 0.6,
+      description: "Interferencias WiFi afectan a la calidad de conexión",
+    },
+    {
+      source: "rendimiento_red",
+      target: "network_congestion",
+      weight: 0.75,
+      description: "Bajo rendimiento puede deberse a congestión de red",
+    },
+    {
+      source: "rendimiento_red",
+      target: "server_overload",
+      weight: 0.7,
+      description: "Sobrecarga del servidor reduce el rendimiento",
+    },
+    {
+      source: "rendimiento_red",
+      target: "network_hardware",
+      weight: 0.6,
+      description: "Hardware defectuoso afecta al rendimiento",
+    },
+    {
+      source: "configuracion_red",
+      target: "dns_config",
+      weight: 0.85,
+      description: "Problemas de configuración a menudo implican DNS incorrectos",
+    },
+    {
+      source: "configuracion_red",
+      target: "router_failure",
+      weight: 0.5,
+      description: "Fallos del router pueden causar problemas de configuración",
+    },
 
-    // Relaciones de intensidad WiFi
-    { source: "intensidad_wifi", target: "interferencia", weight: -0.9 },
-    { source: "intensidad_wifi", target: "fallo_router", weight: -0.5 },
-
-    // Relaciones de latencia
-    { source: "latencia", target: "congestion", weight: 0.8 },
-    { source: "latencia", target: "fallo_router", weight: 0.6 },
-    { source: "latencia", target: "config_incorrecta", weight: 0.4 },
-
-    // Relaciones de acceso
-    { source: "acceso", target: "config_incorrecta", weight: -0.9 },
-    { source: "acceso", target: "fallo_infraestructura", weight: -0.7 },
-    { source: "acceso", target: "fallo_router", weight: -0.5 },
-
-    // Relaciones entre causas (efectos secundarios)
-    { source: "fallo_router", target: "congestion", weight: 0.4 },
-    { source: "interferencia", target: "congestion", weight: 0.3 },
-    { source: "fallo_infraestructura", target: "congestion", weight: 0.6 },
+    // Conexiones entre causas
+    {
+      source: "router_failure",
+      target: "network_hardware",
+      weight: 0.4,
+      description: "Fallos de hardware pueden afectar al router",
+    },
+    {
+      source: "isp_problems",
+      target: "network_congestion",
+      weight: 0.5,
+      description: "Problemas del ISP pueden causar congestión",
+    },
+    {
+      source: "wifi_interference",
+      target: "network_congestion",
+      weight: 0.3,
+      description: "Interferencias pueden contribuir a la congestión",
+    },
   ],
 }
 
-// Función para abrir el diálogo del mapa cognitivo difuso desde fuera del componente
-export function openFCMDialog() {
-  // Esta función será implementada por el componente cuando se monte
-  console.log("openFCMDialog called but not yet implemented")
-}
-
-export function FuzzyCognitiveMap({
-  open: externalOpen,
-  onOpenChange: externalOnOpenChange,
-}: {
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
-} = {}) {
-  const [internalOpen, setInternalOpen] = useState(false)
-
-  // Usa el estado externo si se proporciona, de lo contrario usa el interno
-  const open = externalOpen !== undefined ? externalOpen : internalOpen
-  const setOpen = (value: boolean) => {
-    if (externalOnOpenChange) {
-      externalOnOpenChange(value)
-    } else {
-      setInternalOpen(value)
-    }
-  }
+export function FuzzyCognitiveMap({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [hoveredNode, setHoveredNode] = useState<FCMNode | null>(null)
-  const [hoveredRelation, setHoveredRelation] = useState<FCMRelation | null>(null)
-  const [selectedNode, setSelectedNode] = useState<FCMNode | null>(null)
+  const [hoveredEdge, setHoveredEdge] = useState<FCMEdge | null>(null)
+  const [selectedNodeType, setSelectedNodeType] = useState<string | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
 
   // Estado para el zoom
-  const [zoomLevel, setZoomLevel] = useState(1)
+  const [zoomLevel, setZoomLevel] = useState(1.5) // Aumentado el zoom inicial a 1.5
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
@@ -123,265 +271,264 @@ export function FuzzyCognitiveMap({
 
   // Función para resetear el zoom
   const resetZoom = () => {
-    setZoomLevel(1)
+    setZoomLevel(1.5) // Resetear al zoom inicial de 1.5
     setPanOffset({ x: 0, y: 0 })
   }
 
+  // Función para alternar el modo de pantalla completa
+  const toggleFullscreen = () => {
+    setFullscreen(!fullscreen)
+  }
+
+  // Función para exportar el mapa como imagen
+  const exportAsImage = () => {
+    const svgElement = document.querySelector(".fcm-svg") as SVGSVGElement
+    if (!svgElement) return
+
+    const svgData = new XMLSerializer().serializeToString(svgElement)
+    const canvas = document.createElement("canvas")
+    const ctx = canvas.getContext("2d")
+    const img = new Image()
+
+    // Establecer dimensiones del canvas (más grandes para mejor calidad)
+    canvas.width = svgElement.viewBox.baseVal.width * 3
+    canvas.height = svgElement.viewBox.baseVal.height * 3
+
+    img.onload = () => {
+      if (ctx) {
+        ctx.fillStyle = "white"
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+        // Crear enlace de descarga
+        const a = document.createElement("a")
+        a.download = "mapa-cognitivo-difuso.png"
+        a.href = canvas.toDataURL("image/png")
+        a.click()
+      }
+    }
+
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)))
+  }
+
+  // Filtrar nodos según el tipo seleccionado
+  const filteredData = React.useMemo(() => {
+    if (!selectedNodeType) return fcmData
+
+    const filteredNodes = fcmData.nodes.filter((node) => !selectedNodeType || node.type === selectedNodeType)
+    const filteredNodeIds = new Set(filteredNodes.map((node) => node.id))
+
+    const filteredEdges = fcmData.edges.filter(
+      (edge) => filteredNodeIds.has(edge.source) && filteredNodeIds.has(edge.target),
+    )
+
+    return { nodes: filteredNodes, edges: filteredEdges }
+  }, [selectedNodeType])
+
   return (
-    <>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle>Mapa Cognitivo Difuso de Criterios Evaluativos</DialogTitle>
-          </DialogHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className={`${fullscreen ? "max-w-[95vw] max-h-[95vh] w-[95vw] h-[95vh]" : "max-w-6xl max-h-[90vh]"} overflow-auto`}
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            <span>Mapa Cognitivo Difuso del Sistema de Diagnóstico</span>
+            <div className="flex gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setSelectedNodeType(selectedNodeType ? null : "causa")}
+                    >
+                      <Filter className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{selectedNodeType ? "Mostrar todos los nodos" : "Filtrar por causas"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-            <div className="md:col-span-2">
-              <div className="border rounded-lg p-4 bg-white h-[600px] relative">
-                {/* Controles de zoom */}
-                <div className="absolute top-2 right-2 z-20 flex flex-col gap-2 bg-white/80 p-1 rounded-md shadow-sm">
-                  <Button variant="outline" size="icon" onClick={zoomIn} title="Acercar" className="h-8 w-8">
-                    <ZoomIn className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" onClick={zoomOut} title="Alejar" className="h-8 w-8">
-                    <ZoomOut className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={resetZoom}
-                    title="Restablecer zoom"
-                    className="h-8 w-8"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={toggleFullscreen}>
+                      <Maximize2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{fullscreen ? "Salir de pantalla completa" : "Pantalla completa"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-                {/* Indicador de zoom */}
-                <div className="absolute bottom-2 right-2 z-20 bg-white/80 px-2 py-1 rounded-md text-xs text-gray-600">
-                  Zoom: {Math.round(zoomLevel * 100)}%
-                </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={exportAsImage}>
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Exportar como imagen</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
 
-                <FCMVisualization
-                  data={fcmData}
-                  onNodeHover={setHoveredNode}
-                  onRelationHover={setHoveredRelation}
-                  onNodeClick={setSelectedNode}
-                  zoomLevel={zoomLevel}
-                  panOffset={panOffset}
-                  setPanOffset={setPanOffset}
-                  isDragging={isDragging}
-                  setIsDragging={setIsDragging}
-                  dragStart={dragStart}
-                  setDragStart={setDragStart}
-                />
+        <div className={`border rounded-lg p-4 bg-white ${fullscreen ? "h-[80vh]" : "h-[700px]"} relative`}>
+          {/* Controles de zoom */}
+          <div className="absolute top-2 right-2 z-20 flex flex-col gap-2 bg-white/80 p-1 rounded-md shadow-sm">
+            <Button variant="outline" size="icon" onClick={zoomIn} title="Acercar" className="h-8 w-8">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={zoomOut} title="Alejar" className="h-8 w-8">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={resetZoom} title="Restablecer zoom" className="h-8 w-8">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
 
-                {/* Información sobre nodo al hacer hover */}
-                {hoveredNode && (
-                  <div className="absolute top-2 left-2 bg-white p-2 border rounded shadow-md z-10">
-                    <h4 className="font-medium">{hoveredNode.name}</h4>
-                    <p className="text-xs text-gray-500">
-                      {hoveredNode.type === "input"
-                        ? "Variable Lingüística"
-                        : hoveredNode.type === "cause"
-                          ? "Causa Potencial"
-                          : "Variable de Salida"}
-                    </p>
-                  </div>
-                )}
+          {/* Indicador de zoom */}
+          <div className="absolute bottom-2 right-2 z-20 bg-white/80 px-2 py-1 rounded-md text-xs text-gray-600">
+            Zoom: {Math.round(zoomLevel * 100)}%
+          </div>
 
-                {/* Información sobre relación al hacer hover */}
-                {hoveredRelation && (
-                  <div className="absolute top-2 left-40 bg-white p-2 border rounded shadow-md z-10">
-                    <h4 className="font-medium">Relación Causal</h4>
-                    <p className="text-sm">
-                      {getNodeName(fcmData, hoveredRelation.source)} → {getNodeName(fcmData, hoveredRelation.target)}
-                    </p>
-                    <p className="text-sm">
-                      Peso: {hoveredRelation.weight.toFixed(2)}(
-                      {hoveredRelation.weight > 0 ? "Relación Positiva" : "Relación Negativa"})
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {Math.abs(hoveredRelation.weight) > 0.7
-                        ? "Influencia Fuerte"
-                        : Math.abs(hoveredRelation.weight) > 0.4
-                          ? "Influencia Media"
-                          : "Influencia Débil"}
-                    </p>
-                  </div>
-                )}
+          {/* Filtros de tipo de nodo */}
+          <div className="absolute top-2 left-2 z-20 flex gap-2 bg-white/80 p-2 rounded-md shadow-sm">
+            <Button
+              variant={selectedNodeType === null ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedNodeType(null)}
+              className="text-xs h-7"
+            >
+              Todos
+            </Button>
+            <Button
+              variant={selectedNodeType === "sintoma" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedNodeType("sintoma")}
+              className="text-xs h-7"
+            >
+              Síntomas
+            </Button>
+            <Button
+              variant={selectedNodeType === "factor" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedNodeType("factor")}
+              className="text-xs h-7"
+            >
+              Factores
+            </Button>
+            <Button
+              variant={selectedNodeType === "causa" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedNodeType("causa")}
+              className="text-xs h-7"
+            >
+              Causas
+            </Button>
+          </div>
+
+          <FCMVisualization
+            data={filteredData}
+            onNodeHover={setHoveredNode}
+            onEdgeHover={setHoveredEdge}
+            zoomLevel={zoomLevel}
+            panOffset={panOffset}
+            setPanOffset={setPanOffset}
+            isDragging={isDragging}
+            setIsDragging={setIsDragging}
+            dragStart={dragStart}
+            setDragStart={setDragStart}
+            setZoomLevel={setZoomLevel}
+            fullscreen={fullscreen}
+          />
+
+          {/* Información sobre nodo al hacer hover */}
+          {hoveredNode && (
+            <div className="absolute top-16 left-2 bg-white p-3 border rounded shadow-md z-10 max-w-xs">
+              <h4 className="font-medium text-base">{hoveredNode.label}</h4>
+              <p className="text-xs text-gray-500 mt-1">
+                Tipo: {hoveredNode.type === "sintoma" ? "Síntoma" : hoveredNode.type === "causa" ? "Causa" : "Factor"}
+              </p>
+              {hoveredNode.description && <p className="text-xs mt-2 text-gray-600">{hoveredNode.description}</p>}
+            </div>
+          )}
+
+          {/* Información sobre enlace al hacer hover */}
+          {hoveredEdge && (
+            <div className="absolute top-16 left-64 bg-white p-3 border rounded shadow-md z-10 max-w-xs">
+              <h4 className="font-medium text-base">Relación</h4>
+              <p className="text-sm mt-1">
+                {getNodeLabel(hoveredEdge.source, filteredData.nodes)} →{" "}
+                {getNodeLabel(hoveredEdge.target, filteredData.nodes)}
+              </p>
+              <p className="text-sm mt-1">Peso: {hoveredEdge.weight.toFixed(2)}</p>
+              {hoveredEdge.description && <p className="text-xs mt-2 text-gray-600">{hoveredEdge.description}</p>}
+            </div>
+          )}
+        </div>
+
+        {/* Leyenda */}
+        <div className="mt-4 border rounded-lg p-4 bg-white">
+          <h3 className="font-medium mb-2">Leyenda</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-center mb-2">
+                <div className="w-4 h-4 rounded-full bg-[#E41A1C] mr-2"></div>
+                <span className="text-sm">Síntomas</span>
               </div>
-
-              {/* Leyenda */}
-              <div className="mt-4 border rounded-lg p-4 bg-white">
-                <h3 className="font-medium mb-2">Leyenda</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex items-center mb-2">
-                      <div className="w-4 h-4 rounded-full bg-[#4E79A7] mr-2"></div>
-                      <span className="text-sm">Variables Lingüísticas</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="w-4 h-4 rounded-full bg-[#F28E2B] mr-2"></div>
-                      <span className="text-sm">Causas Potenciales</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm mb-1">Relaciones:</div>
-                    <div className="flex items-center">
-                      <div className="h-[2px] w-10 bg-[#59A14F] mr-2"></div>
-                      <span className="text-xs">Relación Positiva</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="h-[2px] w-10 bg-[#E15759] mr-2"></div>
-                      <span className="text-xs">Relación Negativa</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="h-[3px] w-10 bg-[#555555] mr-2"></div>
-                      <span className="text-xs">Influencia Fuerte</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-gray-600">
-                  <p>• El grosor de las líneas indica la fuerza de la relación causal</p>
-                  <p>• Las líneas verdes indican relaciones positivas (si A aumenta, B aumenta)</p>
-                  <p>• Las líneas rojas indican relaciones negativas (si A aumenta, B disminuye)</p>
-                </div>
+              <div className="flex items-center mb-2">
+                <div className="w-4 h-4 rounded-full bg-[#377EB8] mr-2"></div>
+                <span className="text-sm">Factores</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 rounded-full bg-[#4DAF4A] mr-2"></div>
+                <span className="text-sm">Causas</span>
               </div>
             </div>
-
-            {/* Panel lateral con información adicional */}
             <div>
-              <Card className="p-4 h-full">
-                <h3 className="font-medium mb-4">Información del Mapa Cognitivo Difuso</h3>
-
-                {selectedNode ? (
-                  <div>
-                    <h4 className="font-medium text-blue-700 mb-2">{selectedNode.name}</h4>
-
-                    {selectedNode.type === "input" ? (
-                      <>
-                        <p className="text-sm mb-4">
-                          Variable lingüística de entrada que representa un criterio evaluativo en el sistema difuso.
-                        </p>
-
-                        <h5 className="font-medium mt-4 mb-2">Influye en:</h5>
-                        <ul className="space-y-1 text-sm">
-                          {fcmData.relations
-                            .filter((rel) => rel.source === selectedNode.id)
-                            .sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight))
-                            .map((rel, index) => {
-                              const targetNode = fcmData.nodes.find((n) => n.id === rel.target)
-                              return (
-                                <li key={index} className="flex items-start">
-                                  <span
-                                    className={`inline-block w-2 h-2 rounded-full mr-2 mt-1.5 ${rel.weight > 0 ? "bg-[#59A14F]" : "bg-[#E15759]"}`}
-                                  ></span>
-                                  {targetNode?.name} ({rel.weight > 0 ? "+" : ""}
-                                  {rel.weight.toFixed(2)})
-                                </li>
-                              )
-                            })}
-                        </ul>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm mb-4">
-                          Causa potencial que puede ser identificada por el sistema difuso basado en los valores de las
-                          variables de entrada.
-                        </p>
-
-                        <h5 className="font-medium mt-4 mb-2">Influenciado por:</h5>
-                        <ul className="space-y-1 text-sm">
-                          {fcmData.relations
-                            .filter((rel) => rel.target === selectedNode.id)
-                            .sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight))
-                            .map((rel, index) => {
-                              const sourceNode = fcmData.nodes.find((n) => n.id === rel.source)
-                              return (
-                                <li key={index} className="flex items-start">
-                                  <span
-                                    className={`inline-block w-2 h-2 rounded-full mr-2 mt-1.5 ${rel.weight > 0 ? "bg-[#59A14F]" : "bg-[#E15759]"}`}
-                                  ></span>
-                                  {sourceNode?.name} ({rel.weight > 0 ? "+" : ""}
-                                  {rel.weight.toFixed(2)})
-                                </li>
-                              )
-                            })}
-                        </ul>
-
-                        {fcmData.relations.some((rel) => rel.source === selectedNode.id) && (
-                          <>
-                            <h5 className="font-medium mt-4 mb-2">Influye en:</h5>
-                            <ul className="space-y-1 text-sm">
-                              {fcmData.relations
-                                .filter((rel) => rel.source === selectedNode.id)
-                                .sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight))
-                                .map((rel, index) => {
-                                  const targetNode = fcmData.nodes.find((n) => n.id === rel.target)
-                                  return (
-                                    <li key={index} className="flex items-start">
-                                      <span
-                                        className={`inline-block w-2 h-2 rounded-full mr-2 mt-1.5 ${rel.weight > 0 ? "bg-[#59A14F]" : "bg-[#E15759]"}`}
-                                      ></span>
-                                      {targetNode?.name} ({rel.weight > 0 ? "+" : ""}
-                                      {rel.weight.toFixed(2)})
-                                    </li>
-                                  )
-                                })}
-                            </ul>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Selecciona un nodo para ver información detallada sobre sus relaciones causales.
-                    </p>
-
-                    <h4 className="font-medium mb-2">Sobre los Mapas Cognitivos Difusos</h4>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Los Mapas Cognitivos Difusos (FCM) son una técnica de modelado que combina aspectos de redes
-                      neuronales y lógica difusa para representar conocimiento causal. En este diagrama:
-                    </p>
-                    <ul className="text-sm text-gray-600 space-y-2">
-                      <li>• Los nodos azules representan variables lingüísticas de entrada (criterios evaluativos)</li>
-                      <li>• Los nodos naranjas representan causas potenciales de problemas de red</li>
-                      <li>• Las conexiones representan relaciones causales con diferentes pesos</li>
-                      <li>• El peso de una relación indica la fuerza e influencia (positiva o negativa)</li>
-                    </ul>
-
-                    <h4 className="font-medium mt-4 mb-2">Aplicación en el Sistema Difuso</h4>
-                    <p className="text-sm text-gray-600">
-                      Este mapa muestra cómo las variables lingüísticas influyen en la identificación de causas
-                      potenciales en el sistema experto difuso. Las relaciones causales con sus pesos representan las
-                      reglas difusas implementadas en el sistema.
-                    </p>
-                  </div>
-                )}
-              </Card>
+              <div className="text-sm mb-1">Grosor de línea:</div>
+              <div className="flex items-center">
+                <div className="h-[1px] w-10 bg-[#666666] mr-2"></div>
+                <span className="text-xs">Relación débil (peso &lt; 0.4)</span>
+              </div>
+              <div className="flex items-center">
+                <div className="h-[2px] w-10 bg-[#666666] mr-2"></div>
+                <span className="text-xs">Relación media (0.4 ≤ peso ≤ 0.7)</span>
+              </div>
+              <div className="flex items-center">
+                <div className="h-[3px] w-10 bg-[#666666] mr-2"></div>
+                <span className="text-xs">Relación fuerte (peso &gt; 0.7)</span>
+              </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+          <div className="mt-4 text-sm text-gray-700">
+            <p className="font-medium mb-1">Sobre el Mapa Cognitivo Difuso:</p>
+            <p className="text-xs text-gray-600">
+              El mapa cognitivo difuso representa las relaciones causales entre síntomas, factores intermedios y causas
+              potenciales. El grosor de las líneas indica la fuerza de la relación causal, y la dirección de las flechas
+              muestra el flujo de influencia. Este modelo permite razonar con incertidumbre y capturar relaciones
+              complejas entre múltiples variables.
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
-}
-
-// Función auxiliar para obtener el nombre de un nodo por su ID
-function getNodeName(data: FCMData, nodeId: string): string {
-  const node = data.nodes.find((n) => n.id === nodeId)
-  return node ? node.name : nodeId
 }
 
 // Componente para la visualización del mapa cognitivo difuso
 function FCMVisualization({
   data,
   onNodeHover,
-  onRelationHover,
-  onNodeClick,
+  onEdgeHover,
   zoomLevel,
   panOffset,
   setPanOffset,
@@ -389,11 +536,12 @@ function FCMVisualization({
   setIsDragging,
   dragStart,
   setDragStart,
+  setZoomLevel,
+  fullscreen,
 }: {
   data: FCMData
   onNodeHover: (node: FCMNode | null) => void
-  onRelationHover: (relation: FCMRelation | null) => void
-  onNodeClick: (node: FCMNode) => void
+  onEdgeHover: (edge: FCMEdge | null) => void
   zoomLevel: number
   panOffset: { x: number; y: number }
   setPanOffset: (offset: { x: number; y: number }) => void
@@ -401,6 +549,8 @@ function FCMVisualization({
   setIsDragging: (dragging: boolean) => void
   dragStart: { x: number; y: number }
   setDragStart: (start: { x: number; y: number }) => void
+  setZoomLevel: (zoom: number) => void
+  fullscreen: boolean
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -442,24 +592,17 @@ function FCMVisualization({
     // Calcular el nuevo nivel de zoom
     const newZoom = Math.max(0.5, Math.min(3, zoomLevel + delta))
 
-    // Actualizar el zoom
-    // setZoomLevel(newZoom) // This line was causing the error
+    // Actualizar el zoom usando la prop setZoomLevel
+    if (typeof setZoomLevel === "function") {
+      setZoomLevel(newZoom)
+    }
   }
 
   useEffect(() => {
     if (!containerRef.current) return
 
-    // Calcular posiciones para los nodos si no están definidas
-    const dataWithPositions = calculateNodePositions(data)
-
     // Renderizar la visualización
-    const svg = renderFCMVisualization(
-      containerRef.current,
-      dataWithPositions,
-      onNodeHover,
-      onRelationHover,
-      onNodeClick,
-    )
+    const svg = renderFCMVisualization(containerRef.current, data, onNodeHover, onEdgeHover, fullscreen)
 
     // Guardar referencia al SVG
     svgRef.current = svg
@@ -468,7 +611,7 @@ function FCMVisualization({
     if (svg) {
       const mainGroup = svg.querySelector("g.main-group")
       if (mainGroup) {
-        const centerX = 600 // Mitad del viewBox
+        const centerX = 500 // Mitad del viewBox
         const centerY = 300 // Mitad del viewBox
 
         // Transformación: primero trasladar al centro, luego aplicar zoom, luego trasladar de vuelta y aplicar pan
@@ -484,7 +627,7 @@ function FCMVisualization({
         containerRef.current.innerHTML = ""
       }
     }
-  }, [data, onNodeHover, onRelationHover, onNodeClick, zoomLevel, panOffset])
+  }, [data, onNodeHover, onEdgeHover, zoomLevel, panOffset, setZoomLevel, fullscreen])
 
   return (
     <div
@@ -499,42 +642,13 @@ function FCMVisualization({
   )
 }
 
-// Función para calcular posiciones de los nodos
-function calculateNodePositions(data: FCMData): FCMData {
-  const result = { ...data, nodes: [...data.nodes] }
-
-  // Separar nodos por tipo
-  const inputNodes = result.nodes.filter((node) => node.type === "input")
-  const causeNodes = result.nodes.filter((node) => node.type === "cause")
-
-  // Calcular posiciones para nodos de entrada (arriba)
-  const inputCount = inputNodes.length
-  const inputSpacing = 1000 / (inputCount + 1)
-
-  inputNodes.forEach((node, index) => {
-    node.x = 100 + (index + 1) * inputSpacing
-    node.y = 100
-  })
-
-  // Calcular posiciones para nodos de causa (abajo)
-  const causeCount = causeNodes.length
-  const causeSpacing = 1000 / (causeCount + 1)
-
-  causeNodes.forEach((node, index) => {
-    node.x = 100 + (index + 1) * causeSpacing
-    node.y = 500
-  })
-
-  return result
-}
-
-// Función para renderizar la visualización del mapa cognitivo difuso
+// Función para renderizar el mapa cognitivo difuso
 function renderFCMVisualization(
   container: HTMLDivElement,
   data: FCMData,
   onNodeHover: (node: FCMNode | null) => void,
-  onRelationHover: (relation: FCMRelation | null) => void,
-  onNodeClick: (node: FCMNode) => void,
+  onEdgeHover: (edge: FCMEdge | null) => void,
+  fullscreen: boolean,
 ): SVGSVGElement {
   // Limpiar el contenedor
   container.innerHTML = ""
@@ -543,7 +657,8 @@ function renderFCMVisualization(
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
   svg.setAttribute("width", "100%")
   svg.setAttribute("height", "100%")
-  svg.setAttribute("viewBox", "0 0 1200 600")
+  svg.setAttribute("viewBox", "0 0 1000 600")
+  svg.setAttribute("class", "fcm-svg")
   container.appendChild(svg)
 
   // Crear un grupo principal para aplicar transformaciones
@@ -551,55 +666,94 @@ function renderFCMVisualization(
   mainGroup.setAttribute("class", "main-group")
   svg.appendChild(mainGroup)
 
-  // Definir colores
-  const colorInput = "#4E79A7" // Azul para variables de entrada
-  const colorCause = "#F28E2B" // Naranja para causas
-  const colorPositiveRelation = "#59A14F" // Verde para relaciones positivas
-  const colorNegativeRelation = "#E15759" // Rojo para relaciones negativas
+  // Definir colores según el tipo de nodo
+  const nodeColors = {
+    sintoma: "#E41A1C", // Rojo
+    factor: "#377EB8", // Azul
+    causa: "#4DAF4A", // Verde
+  }
 
-  // Dibujar relaciones
-  data.relations.forEach((relation) => {
-    const sourceNode = data.nodes.find((n) => n.id === relation.source)
-    const targetNode = data.nodes.find((n) => n.id === relation.target)
+  // Calcular posiciones de los nodos
+  const nodePositions: Record<string, { x: number; y: number }> = {}
 
-    if (!sourceNode || !targetNode || !sourceNode.x || !sourceNode.y || !targetNode.x || !targetNode.y) return
+  // Posicionar síntomas en la parte superior
+  const sintomas = data.nodes.filter((node) => node.type === "sintoma")
+  const sintomaWidth = 800 / (sintomas.length + 1)
+  sintomas.forEach((node, index) => {
+    nodePositions[node.id] = {
+      x: 100 + (index + 1) * sintomaWidth,
+      y: 100,
+    }
+  })
 
-    // Crear grupo para la relación
-    const relationGroup = document.createElementNS("http://www.w3.org/2000/svg", "g")
-    relationGroup.setAttribute("class", "relation")
-    mainGroup.appendChild(relationGroup)
+  // Posicionar factores en el medio
+  const factores = data.nodes.filter((node) => node.type === "factor")
+  const factorWidth = 800 / (factores.length + 1)
+  factores.forEach((node, index) => {
+    nodePositions[node.id] = {
+      x: 100 + (index + 1) * factorWidth,
+      y: 300,
+    }
+  })
 
-    // Determinar color y grosor según el peso
-    const color = relation.weight >= 0 ? colorPositiveRelation : colorNegativeRelation
-    const strokeWidth = Math.abs(relation.weight) > 0.7 ? 3 : Math.abs(relation.weight) > 0.4 ? 2 : 1
+  // Posicionar causas en la parte inferior
+  const causas = data.nodes.filter((node) => node.type === "causa")
+  const causaWidth = 800 / (causas.length + 1)
+  causas.forEach((node, index) => {
+    nodePositions[node.id] = {
+      x: 100 + (index + 1) * causaWidth,
+      y: 500,
+    }
+  })
 
-    // Calcular puntos para la curva
-    const startX = sourceNode.x
-    const startY = sourceNode.y
-    const endX = targetNode.x
-    const endY = targetNode.y
+  // Dibujar enlaces
+  data.edges.forEach((edge) => {
+    const sourcePos = nodePositions[edge.source]
+    const targetPos = nodePositions[edge.target]
 
-    // Calcular punto de control para curva cuadrática
-    const controlX = (startX + endX) / 2
-    const controlY = (startY + endY) / 2 - 50 // Desplazar hacia arriba para curvar
+    if (!sourcePos || !targetPos) return
 
-    // Dibujar la línea de relación
+    // Determinar grosor de línea según el peso
+    let strokeWidth = 1
+    if (edge.weight > 0.7) {
+      strokeWidth = 3
+    } else if (edge.weight >= 0.4) {
+      strokeWidth = 2
+    }
+
+    // Calcular puntos de control para curva Bézier
+    const dx = targetPos.x - sourcePos.x
+    const dy = targetPos.y - sourcePos.y
+    const controlPoint1X = sourcePos.x + dx * 0.5
+    const controlPoint1Y = sourcePos.y + dy * 0.3
+    const controlPoint2X = sourcePos.x + dx * 0.5
+    const controlPoint2Y = targetPos.y - dy * 0.3
+
+    // Crear grupo para el enlace
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g")
+    group.setAttribute("class", "edge")
+    mainGroup.appendChild(group)
+
+    // Dibujar curva Bézier
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path")
-    path.setAttribute("d", `M ${startX} ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}`)
-    path.setAttribute("stroke", color)
+    path.setAttribute(
+      "d",
+      `M ${sourcePos.x} ${sourcePos.y} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${targetPos.x} ${targetPos.y}`,
+    )
+    path.setAttribute("stroke", "#666666")
     path.setAttribute("stroke-width", strokeWidth.toString())
     path.setAttribute("fill", "none")
-    path.setAttribute("marker-end", `url(#arrowhead-${relation.weight >= 0 ? "positive" : "negative"})`)
+    path.setAttribute("marker-end", "url(#arrowhead)")
 
     // Eventos
-    path.addEventListener("mouseover", () => onRelationHover(relation))
-    path.addEventListener("mouseout", () => onRelationHover(null))
+    path.addEventListener("mouseover", () => onEdgeHover(edge))
+    path.addEventListener("mouseout", () => onEdgeHover(null))
 
-    relationGroup.appendChild(path)
+    group.appendChild(path)
 
-    // Añadir etiqueta de peso
-    const labelX = controlX
-    const labelY = controlY - 10
+    // Etiqueta de peso
+    const labelX = sourcePos.x + dx * 0.5
+    const labelY = sourcePos.y + dy * 0.5 - 10
 
     // Fondo para el texto
     const textBg = document.createElementNS("http://www.w3.org/2000/svg", "rect")
@@ -611,10 +765,10 @@ function renderFCMVisualization(
     textBg.setAttribute("height", textHeight.toString())
     textBg.setAttribute("fill", "white")
     textBg.setAttribute("opacity", "0.9")
-    textBg.setAttribute("rx", "3")
-    textBg.setAttribute("ry", "3")
+    textBg.setAttribute("rx", "4")
+    textBg.setAttribute("ry", "4")
 
-    relationGroup.appendChild(textBg)
+    group.appendChild(textBg)
 
     // Texto de peso
     const weightText = document.createElementNS("http://www.w3.org/2000/svg", "text")
@@ -622,33 +776,29 @@ function renderFCMVisualization(
     weightText.setAttribute("y", labelY.toString())
     weightText.setAttribute("text-anchor", "middle")
     weightText.setAttribute("dominant-baseline", "middle")
-    weightText.setAttribute("fill", color)
-    weightText.setAttribute("font-size", "10")
-    weightText.setAttribute("font-weight", "bold")
-    weightText.textContent = relation.weight.toFixed(2)
+    weightText.setAttribute("fill", "#333")
+    weightText.setAttribute("font-size", "12")
+    weightText.textContent = edge.weight.toFixed(2)
 
-    relationGroup.appendChild(weightText)
+    group.appendChild(weightText)
   })
 
   // Dibujar nodos
   data.nodes.forEach((node) => {
-    if (!node.x || !node.y) return
+    const pos = nodePositions[node.id]
+    if (!pos) return
 
     // Crear grupo para el nodo
-    const nodeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g")
-    nodeGroup.setAttribute("class", `node ${node.type}-node`)
-    nodeGroup.setAttribute("data-id", node.id)
-    mainGroup.appendChild(nodeGroup)
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g")
+    group.setAttribute("class", "node")
+    mainGroup.appendChild(group)
 
-    // Determinar color según el tipo
-    const color = node.type === "input" ? colorInput : colorCause
-
-    // Crear círculo para el nodo
+    // Dibujar círculo
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle")
-    circle.setAttribute("cx", node.x.toString())
-    circle.setAttribute("cy", node.y.toString())
-    circle.setAttribute("r", "30")
-    circle.setAttribute("fill", color)
+    circle.setAttribute("cx", pos.x.toString())
+    circle.setAttribute("cy", pos.y.toString())
+    circle.setAttribute("r", "25") // Aumentado de 20 a 25
+    circle.setAttribute("fill", nodeColors[node.type])
 
     // Añadir sombra
     const filter = document.createElementNS("http://www.w3.org/2000/svg", "filter")
@@ -684,88 +834,49 @@ function renderFCMVisualization(
     // Eventos
     circle.addEventListener("mouseover", () => onNodeHover(node))
     circle.addEventListener("mouseout", () => onNodeHover(null))
-    circle.addEventListener("click", () => onNodeClick(node))
 
-    nodeGroup.appendChild(circle)
+    group.appendChild(circle)
 
-    // Texto para el nodo
+    // Texto del nodo
     const text = document.createElementNS("http://www.w3.org/2000/svg", "text")
-    text.setAttribute("x", node.x.toString())
-    text.setAttribute("y", node.y.toString())
+    text.setAttribute("x", pos.x.toString())
+    text.setAttribute("y", (pos.y + 40).toString()) // Posicionado debajo del círculo
     text.setAttribute("text-anchor", "middle")
-    text.setAttribute("dominant-baseline", "middle")
-    text.setAttribute("fill", "white")
-    text.setAttribute("font-size", "12")
+    text.setAttribute("fill", "#333")
+    text.setAttribute("font-size", "14") // Aumentado de 12 a 14
     text.setAttribute("font-weight", "bold")
 
-    // Ajustar el texto para que quepa en el nodo
-    const displayText = node.name
-    if (displayText.length > 15) {
-      const parts = displayText.split(" ")
-      if (parts.length > 1) {
-        // Dividir en dos líneas si hay espacios
-        const midpoint = Math.floor(parts.length / 2)
-        const line1 = parts.slice(0, midpoint).join(" ")
-        const line2 = parts.slice(midpoint).join(" ")
+    // Limitar el texto a 15 caracteres y añadir "..." si es más largo
+    const label = node.label.length > 15 ? node.label.substring(0, 12) + "..." : node.label
+    text.textContent = label
 
-        const tspan1 = document.createElementNS("http://www.w3.org/2000/svg", "tspan")
-        tspan1.setAttribute("x", node.x.toString())
-        tspan1.setAttribute("dy", "-0.6em")
-        tspan1.textContent = line1
-
-        const tspan2 = document.createElementNS("http://www.w3.org/2000/svg", "tspan")
-        tspan2.setAttribute("x", node.x.toString())
-        tspan2.setAttribute("dy", "1.2em")
-        tspan2.textContent = line2
-
-        text.appendChild(tspan1)
-        text.appendChild(tspan2)
-      } else {
-        // Si es una palabra larga, truncar
-        text.textContent = displayText.substring(0, 12) + "..."
-      }
-    } else {
-      text.textContent = displayText
-    }
-
-    nodeGroup.appendChild(text)
+    group.appendChild(text)
   })
 
-  // Definir marcadores de flecha
+  // Definir marcador de flecha
   const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs")
   svg.appendChild(defs)
 
-  // Flecha para relaciones positivas
-  const markerPositive = document.createElementNS("http://www.w3.org/2000/svg", "marker")
-  markerPositive.setAttribute("id", "arrowhead-positive")
-  markerPositive.setAttribute("markerWidth", "10")
-  markerPositive.setAttribute("markerHeight", "7")
-  markerPositive.setAttribute("refX", "9")
-  markerPositive.setAttribute("refY", "3.5")
-  markerPositive.setAttribute("orient", "auto")
+  const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker")
+  marker.setAttribute("id", "arrowhead")
+  marker.setAttribute("markerWidth", "12")
+  marker.setAttribute("markerHeight", "8")
+  marker.setAttribute("refX", "12")
+  marker.setAttribute("refY", "4")
+  marker.setAttribute("orient", "auto")
 
-  const polygonPositive = document.createElementNS("http://www.w3.org/2000/svg", "polygon")
-  polygonPositive.setAttribute("points", "0 0, 10 3.5, 0 7")
-  polygonPositive.setAttribute("fill", colorPositiveRelation)
+  const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon")
+  polygon.setAttribute("points", "0 0, 12 4, 0 8")
+  polygon.setAttribute("fill", "#666666")
 
-  markerPositive.appendChild(polygonPositive)
-  defs.appendChild(markerPositive)
-
-  // Flecha para relaciones negativas
-  const markerNegative = document.createElementNS("http://www.w3.org/2000/svg", "marker")
-  markerNegative.setAttribute("id", "arrowhead-negative")
-  markerNegative.setAttribute("markerWidth", "10")
-  markerNegative.setAttribute("markerHeight", "7")
-  markerNegative.setAttribute("refX", "9")
-  markerNegative.setAttribute("refY", "3.5")
-  markerNegative.setAttribute("orient", "auto")
-
-  const polygonNegative = document.createElementNS("http://www.w3.org/2000/svg", "polygon")
-  polygonNegative.setAttribute("points", "0 0, 10 3.5, 0 7")
-  polygonNegative.setAttribute("fill", colorNegativeRelation)
-
-  markerNegative.appendChild(polygonNegative)
-  defs.appendChild(markerNegative)
+  marker.appendChild(polygon)
+  defs.appendChild(marker)
 
   return svg
+}
+
+// Función auxiliar para obtener la etiqueta de un nodo por su ID
+function getNodeLabel(id: string, nodes: FCMNode[]): string {
+  const node = nodes.find((n) => n.id === id)
+  return node ? node.label : id
 }
