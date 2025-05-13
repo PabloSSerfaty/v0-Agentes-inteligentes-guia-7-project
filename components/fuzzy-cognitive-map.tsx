@@ -129,10 +129,6 @@ export function FuzzyCognitiveMap({
 
   return (
     <>
-      <Button variant="outline" className="mt-4 w-full" onClick={() => setOpen(true)}>
-        Ver Mapa Cognitivo Difuso
-      </Button>
-
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
           <DialogHeader>

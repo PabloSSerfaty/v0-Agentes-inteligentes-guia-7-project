@@ -24,7 +24,8 @@ import { ExpertSystemInfo } from "@/components/expert-system-info"
 import { FuzzySystemInfo } from "@/components/fuzzy-system-info"
 import { BayesianSystemInfo } from "@/components/bayesian-system-info"
 import { DecisionTreeDiagram } from "@/components/decision-tree-visualization"
-import { FuzzyMapButton } from "@/components/fuzzy-map-button"
+// First, import the FuzzyCognitiveMap component
+import { FuzzyCognitiveMap } from "@/components/fuzzy-cognitive-map"
 
 /**
  * Lista de síntomas que pueden ser seleccionados por el usuario.
@@ -52,6 +53,9 @@ export default function HerramientaDiagnosticoRed() {
 
   // Estado para controlar la visibilidad del árbol de decisión
   const [decisionTreeOpen, setDecisionTreeOpen] = useState(false)
+
+  // Then, add state to control the dialog
+  const [fuzzyMapOpen, setFuzzyMapOpen] = useState(false)
 
   /**
    * Maneja la selección/deselección de un síntoma.
@@ -272,8 +276,11 @@ export default function HerramientaDiagnosticoRed() {
                   Utiliza funciones de membresía para determinar el grado de pertenencia a diferentes conjuntos difusos,
                   y reglas difusas para inferir las causas más probables de los problemas de red.
                 </p>
+                {/* Replace the button in the Fuzzy Logic System card with: */}
                 <div className="mt-4">
-                  <FuzzyMapButton />
+                  <Button variant="outline" className="w-full" onClick={() => setFuzzyMapOpen(true)}>
+                    Ver Mapa cognitivo difuso
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -305,8 +312,10 @@ export default function HerramientaDiagnosticoRed() {
           <FuzzySystemInfo />
           <ExpertSystemInfo />
 
-          {/* Añadir el componente DecisionTreeDiagram */}
+          {/* Add the FuzzyCognitiveMap component at the end of the file, right before the closing div tags */}
+          {/* Add it after the DecisionTreeDiagram component */}
           <DecisionTreeDiagram open={decisionTreeOpen} onOpenChange={setDecisionTreeOpen} />
+          <FuzzyCognitiveMap open={fuzzyMapOpen} onOpenChange={setFuzzyMapOpen} />
         </div>
       </div>
     </div>
