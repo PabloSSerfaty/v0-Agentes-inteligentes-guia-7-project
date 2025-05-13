@@ -1,8 +1,10 @@
 /**
  * @file lib/fuzzy-system.ts
  * @description Sistema experto basado en lógica difusa para diagnóstico de problemas de red.
- * Adaptado del código Python original a TypeScript.
+ * Adaptado para mantener coherencia con los otros sistemas simplificados.
  */
+
+import { CAUSAS_UNIFICADAS, ACCIONES_RECOMENDADAS, SINTOMAS_UNIFICADOS, type DiagnosisResult } from "./constants"
 
 // Definición de tipos para el sistema difuso
 type FuzzyValue = number
@@ -16,77 +18,30 @@ interface FuzzyInputs {
   acceso: FuzzyValue
 }
 
-interface FuzzyResult {
-  causas: {
-    causa: string
-    confianza: number
-    acciones: string[]
-  }[]
-}
-
 /**
  * Clase que implementa un sistema experto basado en lógica difusa para diagnóstico de red.
- * Esta implementación es una versión simplificada del sistema original en Python,
- * adaptada para JavaScript/TypeScript.
  */
 export class FuzzyNetworkDiagnosticSystem {
   // Mapeo de nombres de causas para la interfaz
   private causaLabels: Record<string, string> = {
-    congestion: "Congestión de red",
-    fallo_router: "Fallo en el router",
-    interferencia: "Interferencia en señal Wi-Fi",
-    config_incorrecta: "Configuración incorrecta",
-    fallo_infraestructura: "Fallo en la infraestructura",
+    congestion: CAUSAS_UNIFICADAS.NETWORK_CONGESTION,
+    fallo_router: CAUSAS_UNIFICADAS.ROUTER_FAILURE,
+    interferencia: CAUSAS_UNIFICADAS.WIFI_INTERFERENCE,
+    config_incorrecta: CAUSAS_UNIFICADAS.DNS_CONFIG,
+    fallo_infraestructura: CAUSAS_UNIFICADAS.INFRASTRUCTURE_FAILURE,
   }
 
   // Acciones recomendadas para cada causa
   private recomendaciones: Record<string, string[]> = {
-    congestion: [
-      "Revisar y optimizar el uso de ancho de banda",
-      "Implementar QoS (Calidad de Servicio) para priorizar tráfico",
-      "Considerar actualizar la capacidad de la red",
-      "Verificar si hay dispositivos consumiendo excesivo ancho de banda",
-      "Programar transferencias grandes para horas de menor uso",
-    ],
-    fallo_router: [
-      "Reiniciar el router principal",
-      "Verificar la configuración del router",
-      "Considerar reemplazar el router si es antiguo",
-      "Actualizar el firmware del router",
-      "Comprobar si hay sobrecalentamiento del dispositivo",
-    ],
-    interferencia: [
-      "Reubicar dispositivos inalámbricos",
-      "Cambiar el canal WiFi",
-      "Instalar repetidores WiFi en áreas con señal débil",
-      "Alejar el router de otros dispositivos electrónicos",
-      "Considerar usar la banda de 5GHz si está disponible",
-    ],
-    config_incorrecta: [
-      "Verificar la configuración de IP y DNS",
-      "Revisar la configuración de VLANs y subredes",
-      "Comprobar reglas de firewall",
-      "Verificar la configuración DHCP",
-      "Revisar la configuración de enrutamiento",
-    ],
-    fallo_infraestructura: [
-      "Revisar cables y conexiones físicas",
-      "Comprobar puntos de acceso y switches",
-      "Realizar pruebas de continuidad en cables sospechosos",
-      "Verificar el funcionamiento de los equipos de red",
-      "Comprobar si hay daños físicos en la infraestructura",
-    ],
+    congestion: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.NETWORK_CONGESTION],
+    fallo_router: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.ROUTER_FAILURE],
+    interferencia: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.WIFI_INTERFERENCE],
+    config_incorrecta: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.DNS_CONFIG],
+    fallo_infraestructura: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.INFRASTRUCTURE_FAILURE],
   }
 
   /**
    * Función de membresía trapezoidal simplificada.
-   *
-   * @param x - Valor a evaluar
-   * @param a - Primer punto del trapecio
-   * @param b - Segundo punto del trapecio
-   * @param c - Tercer punto del trapecio
-   * @param d - Cuarto punto del trapecio
-   * @returns Grado de pertenencia entre 0 y 1
    */
   private trapmf(x: number, a: number, b: number, c: number, d: number): number {
     if (x <= a) return 0
@@ -98,27 +53,7 @@ export class FuzzyNetworkDiagnosticSystem {
   }
 
   /**
-   * Función de membresía triangular simplificada.
-   *
-   * @param x - Valor a evaluar
-   * @param a - Primer punto del triángulo
-   * @param b - Segundo punto del triángulo (pico)
-   * @param c - Tercer punto del triángulo
-   * @returns Grado de pertenencia entre 0 y 1
-   */
-  private trimf(x: number, a: number, b: number, c: number): number {
-    if (x <= a || x >= c) return 0
-    if (x === b) return 1
-    if (x > a && x < b) return (x - a) / (b - a)
-    if (x > b && x < c) return (c - x) / (c - b)
-    return 0
-  }
-
-  /**
    * Evalúa las funciones de membresía para la velocidad.
-   *
-   * @param x - Valor de velocidad (0-100)
-   * @returns Grados de pertenencia para cada conjunto difuso
    */
   private evaluarVelocidad(x: number): Record<string, number> {
     return {
@@ -130,9 +65,6 @@ export class FuzzyNetworkDiagnosticSystem {
 
   /**
    * Evalúa las funciones de membresía para la estabilidad.
-   *
-   * @param x - Valor de estabilidad (0-100)
-   * @returns Grados de pertenencia para cada conjunto difuso
    */
   private evaluarEstabilidad(x: number): Record<string, number> {
     return {
@@ -144,9 +76,6 @@ export class FuzzyNetworkDiagnosticSystem {
 
   /**
    * Evalúa las funciones de membresía para la intensidad WiFi.
-   *
-   * @param x - Valor de intensidad WiFi (0-100)
-   * @returns Grados de pertenencia para cada conjunto difuso
    */
   private evaluarIntensidadWifi(x: number): Record<string, number> {
     return {
@@ -158,9 +87,6 @@ export class FuzzyNetworkDiagnosticSystem {
 
   /**
    * Evalúa las funciones de membresía para la latencia.
-   *
-   * @param x - Valor de latencia (0-300)
-   * @returns Grados de pertenencia para cada conjunto difuso
    */
   private evaluarLatencia(x: number): Record<string, number> {
     return {
@@ -172,9 +98,6 @@ export class FuzzyNetworkDiagnosticSystem {
 
   /**
    * Evalúa las funciones de membresía para el acceso a servicios.
-   *
-   * @param x - Valor de acceso (0-100)
-   * @returns Grados de pertenencia para cada conjunto difuso
    */
   private evaluarAcceso(x: number): Record<string, number> {
     return {
@@ -185,22 +108,7 @@ export class FuzzyNetworkDiagnosticSystem {
   }
 
   /**
-   * Aplica el operador AND (mínimo) a dos valores difusos.
-   *
-   * @param a - Primer valor difuso
-   * @param b - Segundo valor difuso
-   * @returns El mínimo de los dos valores
-   */
-  private and(a: number, b: number): number {
-    return Math.min(a, b)
-  }
-
-  /**
    * Evalúa una regla difusa basada en antecedentes y consecuentes.
-   *
-   * @param antecedentes - Array de valores de antecedentes
-   * @param consecuentes - Objeto con consecuentes y sus niveles
-   * @returns Valor de activación de la regla
    */
   private evaluarRegla(antecedentes: number[], consecuentes: Record<string, string>): Record<string, number> {
     // Calcular el valor de activación (mínimo de todos los antecedentes)
@@ -217,11 +125,8 @@ export class FuzzyNetworkDiagnosticSystem {
 
   /**
    * Realiza el diagnóstico basado en los valores de entrada.
-   *
-   * @param inputs - Valores de entrada para el diagnóstico
-   * @returns Resultado del diagnóstico con causas y recomendaciones
    */
-  public diagnose(inputs: FuzzyInputs): FuzzyResult {
+  public diagnose(inputs: FuzzyInputs): DiagnosisResult {
     // Evaluar funciones de membresía para cada entrada
     const velocidad = this.evaluarVelocidad(inputs.velocidad)
     const estabilidad = this.evaluarEstabilidad(inputs.estabilidad)
@@ -374,17 +279,27 @@ export class FuzzyNetworkDiagnosticSystem {
       }),
     )
 
-    // Normalizar resultados a porcentajes (0-100)
-    this.normalizarResultados(resultados)
+    // Regla 16: Si acceso es limitado Y velocidad es media Y estabilidad es moderada, entonces config_incorrecta es alta
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([acceso.limitado, velocidad.media, estabilidad.moderada], {
+        config_incorrecta: "alta",
+        fallo_router: "baja",
+      }),
+    )
 
-    // Ordenar causas por nivel de confianza
+    // Caso especial para DNS
+    if (inputs.acceso <= 30 && inputs.latencia >= 50) {
+      resultados.config_incorrecta = Math.max(resultados.config_incorrecta, 0.9)
+    }
+
+    // Ordenar causas por nivel de activación
     const causasOrdenadas = Object.entries(resultados)
-      .map(([causa, confianza]) => ({
+      .sort((a, b) => b[1] - a[1])
+      .map(([causa, _]) => ({
         causa: this.causaLabels[causa],
-        confianza: Math.round(confianza),
         acciones: this.recomendaciones[causa],
       }))
-      .sort((a, b) => b.confianza - a.confianza)
 
     return {
       causas: causasOrdenadas,
@@ -394,9 +309,6 @@ export class FuzzyNetworkDiagnosticSystem {
   /**
    * Actualiza los resultados con los valores de una regla.
    * Utiliza el máximo para combinar resultados.
-   *
-   * @param resultados - Resultados actuales
-   * @param nuevosResultados - Nuevos resultados a combinar
    */
   private actualizarResultados(resultados: FuzzyOutput, nuevosResultados: FuzzyOutput): void {
     for (const causa in nuevosResultados) {
@@ -405,41 +317,7 @@ export class FuzzyNetworkDiagnosticSystem {
   }
 
   /**
-   * Normaliza los resultados para que estén en el rango 0-100.
-   * Asegura que siempre haya al menos un resultado con confianza significativa.
-   *
-   * @param resultados - Resultados a normalizar
-   */
-  private normalizarResultados(resultados: FuzzyOutput): void {
-    // Encontrar el valor máximo
-    const maxValor = Math.max(...Object.values(resultados))
-
-    // Si el máximo es mayor que 0, normalizar
-    if (maxValor > 0) {
-      for (const causa in resultados) {
-        // Normalizar a 0-100 y aplicar un factor para que el máximo sea cercano a 100
-        resultados[causa] = (resultados[causa] / maxValor) * 100
-      }
-    } else {
-      // Si todos los valores son 0, asignar valores por defecto basados en heurísticas
-      // para evitar que todos los diagnósticos tengan 0% de confianza
-      if (Object.keys(resultados).includes("config_incorrecta")) {
-        resultados["config_incorrecta"] = 75 // Los errores de DNS suelen ser problemas de configuración
-      }
-      if (Object.keys(resultados).includes("fallo_router")) {
-        resultados["fallo_router"] = 40 // Los routers también pueden causar problemas de DNS
-      }
-      if (Object.keys(resultados).includes("fallo_infraestructura")) {
-        resultados["fallo_infraestructura"] = 25
-      }
-    }
-  }
-
-  /**
    * Convierte valores de síntomas de la interfaz a valores para el sistema difuso.
-   *
-   * @param sintomas - Síntomas seleccionados en la interfaz
-   * @returns Valores de entrada para el sistema difuso
    */
   public convertirSintomasAEntradas(sintomas: string[]): FuzzyInputs {
     // Valores por defecto
@@ -452,36 +330,37 @@ export class FuzzyNetworkDiagnosticSystem {
     }
 
     // Ajustar valores según los síntomas seleccionados
-    if (sintomas.includes("Sin conexión a Internet")) {
+    if (sintomas.includes(SINTOMAS_UNIFICADOS.NO_INTERNET)) {
       inputs.velocidad = 0
       inputs.acceso = 0
     }
 
-    if (sintomas.includes("Pérdida de paquetes")) {
+    if (sintomas.includes(SINTOMAS_UNIFICADOS.PACKET_LOSS)) {
       inputs.estabilidad = 20
       inputs.latencia = 150
     }
 
-    if (sintomas.includes("Error de DNS")) {
-      inputs.acceso = 30
-      inputs.velocidad = 40 // Afecta a la velocidad percibida
-      inputs.estabilidad = 40 // Puede causar inestabilidad en la conexión
+    if (sintomas.includes(SINTOMAS_UNIFICADOS.DNS_ERROR)) {
+      inputs.acceso = 20
+      inputs.velocidad = 30
+      inputs.estabilidad = 40
+      inputs.latencia = 70
     }
 
-    if (sintomas.includes("Carga lenta de páginas")) {
+    if (sintomas.includes(SINTOMAS_UNIFICADOS.SLOW_LOADING)) {
       inputs.velocidad = 20
       inputs.latencia = 120
     }
 
-    if (sintomas.includes("Señal Wi-Fi débil")) {
+    if (sintomas.includes(SINTOMAS_UNIFICADOS.WEAK_WIFI)) {
       inputs.intensidad_wifi = 15
     }
 
-    if (sintomas.includes("Conexión intermitente")) {
+    if (sintomas.includes(SINTOMAS_UNIFICADOS.INTERMITTENT)) {
       inputs.estabilidad = 25
     }
 
-    if (sintomas.includes("Lentitud al acceder al servidor interno")) {
+    if (sintomas.includes(SINTOMAS_UNIFICADOS.SLOW_INTERNAL)) {
       inputs.velocidad = 30
       inputs.latencia = 100
       inputs.acceso = 40

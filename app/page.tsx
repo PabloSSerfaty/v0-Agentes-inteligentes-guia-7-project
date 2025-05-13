@@ -16,32 +16,19 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { diagnosticarProblemasDeRed, type ExpertSystemType } from "@/lib/diagnose"
+import { LISTA_SINTOMAS, type DiagnosisResult } from "@/lib/constants"
+
+// Importar los componentes de visualización
+import { BayesianNetworkDiagram } from "@/components/bayesian-network-visualization"
+import { ExpertSystemInfo } from "@/components/expert-system-info"
+import { FuzzySystemInfo } from "@/components/fuzzy-system-info"
+import { BayesianSystemInfo } from "@/components/bayesian-system-info"
+import { DecisionTreeDiagram } from "@/components/decision-tree-visualization"
 
 /**
  * Lista de síntomas que pueden ser seleccionados por el usuario.
- * Estos síntomas se mapean a los síntomas del sistema experto en lib/diagnose.ts.
  */
-const SINTOMAS = [
-  "Sin conexión a Internet",
-  "Pérdida de paquetes",
-  "Error de DNS",
-  "Carga lenta de páginas",
-  "Señal Wi-Fi débil",
-  "Conexión intermitente",
-  "Lentitud al acceder al servidor interno",
-]
-
-/**
- * Interfaz que define la estructura del resultado de diagnóstico.
- * Esta estructura debe coincidir con la salida del sistema experto.
- */
-interface ResultadoDiagnostico {
-  causas: {
-    causa: string
-    confianza: number
-    acciones: string[]
-  }[]
-}
+const SINTOMAS = LISTA_SINTOMAS
 
 /**
  * Componente principal de la herramienta de diagnóstico de red.
@@ -54,13 +41,16 @@ export default function HerramientaDiagnosticoRed() {
   const [sintomasSeleccionados, setSintomasSeleccionados] = useState<string[]>([])
 
   // Estado para almacenar el resultado del diagnóstico
-  const [resultado, setResultado] = useState<ResultadoDiagnostico | null>(null)
+  const [resultado, setResultado] = useState<DiagnosisResult | null>(null)
 
   // Estado para controlar la visualización del indicador de carga
   const [cargando, setCargando] = useState(false)
 
   // Estado para el tipo de sistema experto seleccionado
   const [tipoSistema, setTipoSistema] = useState<ExpertSystemType>("bayesian")
+
+  // Estado para controlar la visibilidad del árbol de decisión
+  const [decisionTreeOpen, setDecisionTreeOpen] = useState(false)
 
   /**
    * Maneja la selección/deselección de un síntoma.
@@ -199,19 +189,19 @@ export default function HerramientaDiagnosticoRed() {
                   {/* Mapear cada causa a un panel con acciones recomendadas */}
                   {resultado.causas.map((item, index) => (
                     <div key={index} className="border rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
-                      {/* Encabezado con nombre de la causa y nivel de confianza */}
+                      {/* Encabezado con nombre de la causa */}
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-medium text-gray-900">{item.causa}</h3>
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            item.confianza > 70
+                            index === 0
                               ? "bg-green-100 text-green-800"
-                              : item.confianza > 40
+                              : index < 3
                                 ? "bg-blue-100 text-blue-800"
                                 : "bg-yellow-100 text-yellow-800"
                           }`}
                         >
-                          {item.confianza}% de confianza
+                          {index === 0 ? "Alta probabilidad" : index < 3 ? "Probabilidad media" : "Posible causa"}
                         </span>
                       </div>
                       <Separator className="my-2" />
@@ -258,10 +248,13 @@ export default function HerramientaDiagnosticoRed() {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  El sistema experto bayesiano utiliza el teorema de Bayes para calcular la probabilidad de diferentes
-                  causas basándose en los síntomas observados. Este enfoque actualiza las probabilidades iniciales (a
-                  priori) con nueva evidencia para obtener probabilidades posteriores más precisas.
+                  El sistema experto bayesiano utiliza el teorema de Bayes para identificar las causas más probables
+                  basándose en los síntomas observados. Este enfoque prioriza las causas según su frecuencia de
+                  aparición en los síntomas seleccionados.
                 </p>
+                <div className="mt-4">
+                  <BayesianNetworkDiagram />
+                </div>
               </CardContent>
             </Card>
 
@@ -292,11 +285,24 @@ export default function HerramientaDiagnosticoRed() {
                 <p className="text-gray-600">
                   El sistema basado en reglas utiliza un conjunto de reglas predefinidas para identificar causas
                   probables basándose en los síntomas observados. Este enfoque permite coincidencias exactas y
-                  parciales, priorizando las soluciones según la relevancia y especificidad de las reglas activadas.
+                  parciales, priorizando las soluciones según la relevancia de las reglas activadas.
                 </p>
+                <div className="mt-4">
+                  <Button variant="outline" className="w-full" onClick={() => setDecisionTreeOpen(true)}>
+                    Ver Árbol de Decisión
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Añadir los componentes de información de sistemas expertos */}
+          <BayesianSystemInfo />
+          <FuzzySystemInfo />
+          <ExpertSystemInfo />
+
+          {/* Añadir el componente DecisionTreeDiagram */}
+          <DecisionTreeDiagram open={decisionTreeOpen} onOpenChange={setDecisionTreeOpen} />
         </div>
       </div>
     </div>

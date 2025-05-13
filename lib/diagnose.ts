@@ -7,21 +7,7 @@
 import { NetworkDiagnosticSystem } from "./expert-system"
 import { FuzzyNetworkDiagnosticSystem } from "./fuzzy-system"
 import { RuleBasedNetworkDiagnosticSystem } from "./rule-based-system"
-
-/**
- * Mapeo de síntomas de la interfaz a síntomas del sistema experto.
- * Esto permite que la interfaz use nombres de síntomas más amigables para el usuario
- * mientras el sistema experto usa nombres más técnicos.
- */
-const symptomMapping: Record<string, string> = {
-  "Sin conexión a Internet": "Sin conexión a Internet",
-  "Pérdida de paquetes": "Pérdida de paquetes",
-  "Error de DNS": "Errores de DNS",
-  "Carga lenta de páginas": "Carga lenta de páginas",
-  "Señal Wi-Fi débil": "Señal Wi-Fi débil",
-  "Conexión intermitente": "Conexión intermitente",
-  "Lentitud al acceder al servidor interno": "Lentitud en acceso a red interna",
-}
+import { type DiagnosisResult, SINTOMAS_UNIFICADOS, CAUSAS_UNIFICADAS } from "./constants"
 
 // Crear instancias de los sistemas expertos
 const expertSystem = new NetworkDiagnosticSystem()
@@ -43,21 +29,47 @@ export type ExpertSystemType = "bayesian" | "fuzzy" | "rule-based"
 export async function diagnosticarProblemasDeRed(
   sintomas: string[],
   systemType: ExpertSystemType = "bayesian",
-): Promise<any> {
+): Promise<DiagnosisResult> {
   // Simular un retraso para dar sensación de procesamiento
   await new Promise((resolve) => setTimeout(resolve, 800))
 
   // Realizar el diagnóstico según el tipo de sistema seleccionado
+  let resultado: DiagnosisResult
+
   if (systemType === "fuzzy") {
     // Usar el sistema experto basado en lógica difusa
     const inputs = fuzzySystem.convertirSintomasAEntradas(sintomas)
-    return fuzzySystem.diagnose(inputs)
+    resultado = fuzzySystem.diagnose(inputs)
   } else if (systemType === "rule-based") {
     // Usar el sistema experto basado en reglas
-    return ruleBasedSystem.diagnose(sintomas)
+    resultado = ruleBasedSystem.diagnose(sintomas)
   } else {
     // Usar el sistema experto bayesiano (por defecto)
-    const mappedSymptoms = sintomas.map((s) => symptomMapping[s] || s)
-    return expertSystem.diagnose(mappedSymptoms)
+    resultado = expertSystem.diagnose(sintomas)
   }
+
+  // Aplicar post-procesamiento para mejorar la coherencia
+  if (sintomas.includes(SINTOMAS_UNIFICADOS.DNS_ERROR)) {
+    // Asegurar que para Error de DNS, la configuración de DNS siempre esté entre las primeras causas
+    const dnsConfigIndex = resultado.causas.findIndex((c) => c.causa === CAUSAS_UNIFICADAS.DNS_CONFIG)
+
+    if (dnsConfigIndex > 0) {
+      // Si existe pero no es la primera causa, moverla al principio
+      const dnsConfig = resultado.causas.splice(dnsConfigIndex, 1)[0]
+      resultado.causas.unshift(dnsConfig)
+    } else if (dnsConfigIndex === -1) {
+      // Si no existe, añadirla al principio
+      resultado.causas.unshift({
+        causa: CAUSAS_UNIFICADAS.DNS_CONFIG,
+        acciones: [
+          "Verificar servidores DNS configurados",
+          "Configurar DNS alternativos (8.8.8.8, 1.1.1.1)",
+          "Revisar configuración DHCP",
+          "Limpiar caché DNS en los equipos",
+        ],
+      })
+    }
+  }
+
+  return resultado
 }
