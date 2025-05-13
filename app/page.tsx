@@ -24,6 +24,7 @@ import { ExpertSystemInfo } from "@/components/expert-system-info"
 import { FuzzySystemInfo } from "@/components/fuzzy-system-info"
 import { BayesianSystemInfo } from "@/components/bayesian-system-info"
 import { DecisionTreeDiagram } from "@/components/decision-tree-visualization"
+import { FuzzyMapButton } from "@/components/fuzzy-map-button"
 
 /**
  * Lista de síntomas que pueden ser seleccionados por el usuario.
@@ -271,6 +272,9 @@ export default function HerramientaDiagnosticoRed() {
                   Utiliza funciones de membresía para determinar el grado de pertenencia a diferentes conjuntos difusos,
                   y reglas difusas para inferir las causas más probables de los problemas de red.
                 </p>
+                <div className="mt-4">
+                  <FuzzyMapButton />
+                </div>
               </CardContent>
             </Card>
 

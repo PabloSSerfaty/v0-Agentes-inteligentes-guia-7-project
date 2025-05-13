@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ChevronDown, ChevronUp, BarChart4 } from "lucide-react"
+// Importar el componente FuzzyCognitiveMap
+// import { FuzzyCognitiveMap } from "@/components/fuzzy-cognitive-map"
 
 export function FuzzySystemInfo() {
   const [isOpen, setIsOpen] = useState(false)
