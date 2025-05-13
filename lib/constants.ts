@@ -139,12 +139,35 @@ export const MAPEO_SINTOMAS_REGLAS = {
   [SINTOMAS_UNIFICADOS.SLOW_INTERNAL]: "servidor_lento",
 }
 
+// Mapeo inverso de síntomas internos a nombres legibles
+export const MAPEO_SINTOMAS_REGLAS_INVERSO: Record<string, string> = {
+  sin_internet: "Sin conexión a Internet",
+  ping_falla: "Ping fallido",
+  ping_ok: "Ping exitoso",
+  ping_perdida_paquetes: "Pérdida de paquetes",
+  error_dns: "Error de DNS",
+  paginas_no_cargan: "Páginas no cargan",
+  wifi_debil: "Señal Wi-Fi débil",
+  intermitencia: "Conexión intermitente",
+  servidor_lento: "Servidor lento",
+  wifi: "Conexión Wi-Fi",
+  cable: "Conexión por cable",
+  cable_danado: "Cable dañado",
+  lento_subir_archivos: "Lentitud al subir archivos",
+  multiples_usuarios_afectados: "Múltiples usuarios afectados",
+  mantenimiento_isp: "Mantenimiento del ISP",
+  problemas_persisten: "Problemas persistentes",
+  config_incorrecta: "Configuración incorrecta",
+}
+
 // Interfaz unificada para el resultado del diagnóstico
 export interface DiagnosisResult {
   causas: {
     causa: string
     acciones: string[]
+    probabilidad?: number
   }[]
+  certeza?: number
 }
 
 export const MAPEO_SINTOMAS_BAYESIANO = {

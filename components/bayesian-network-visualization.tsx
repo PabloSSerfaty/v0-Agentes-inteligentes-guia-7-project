@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { CAUSAS_UNIFICADAS, SINTOMAS_UNIFICADOS, ACCIONES_RECOMENDADAS } from "@/lib/constants"
 import { Card } from "@/components/ui/card"
-import { ZoomIn, ZoomOut, RefreshCw } from "lucide-react"
+import { ZoomIn, ZoomOut, RefreshCw, Info } from "lucide-react"
 
 // Definición de tipos para la visualización
 interface Node {
@@ -116,7 +116,12 @@ export function BayesianNetworkDiagram() {
 
   return (
     <>
-      <Button variant="outline" className="mt-4 w-full" onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        className="mt-4 w-full flex items-center justify-center gap-2"
+        onClick={() => setOpen(true)}
+      >
+        <Info className="h-4 w-4" />
         Ver Red Bayesiana
       </Button>
 
@@ -363,7 +368,7 @@ function BayesianNetworkGraph({
     const newZoom = Math.max(0.5, Math.min(3, zoomLevel + delta))
 
     // Actualizar el zoom
-    // setZoomLevel(newZoom) // The setZoomLevel variable is undeclared. Please fix the import or declare the variable before using it.
+    setZoomLevel(newZoom)
   }
 
   useEffect(() => {
@@ -798,7 +803,7 @@ function renderEnhancedVisualization(
     group.appendChild(textBg)
 
     // Texto de probabilidad
-    const probText = document.createElementNS("http://www.w3.org/2000/svg", "text")
+    const probText = document.createElementNS("http://wwwwww.w3.org/2000/svg", "text")
     probText.setAttribute("x", labelX.toString())
     probText.setAttribute("y", adjustedLabelY.toString())
     probText.setAttribute("text-anchor", "middle")

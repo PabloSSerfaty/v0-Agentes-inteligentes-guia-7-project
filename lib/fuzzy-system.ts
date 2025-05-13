@@ -1,25 +1,29 @@
 /**
  * @file lib/fuzzy-system.ts
  * @description Sistema experto basado en lógica difusa para diagnóstico de problemas de red.
- * Adaptado para mantener coherencia con los otros sistemas simplificados.
+ * Versión mejorada con correcciones de discrepancias y optimizaciones.
  */
 
-import { CAUSAS_UNIFICADAS, ACCIONES_RECOMENDADAS, SINTOMAS_UNIFICADOS, type DiagnosisResult } from "./constants"
+import { CAUSAS_UNIFICADAS, ACCIONES_RECOMENDADAS, type DiagnosisResult } from "./constants"
 
 // Definición de tipos para el sistema difuso
 type FuzzyValue = number
 type FuzzyOutput = Record<string, number>
 
+// Interfaz para los valores de entrada continuos
 interface FuzzyInputs {
-  velocidad: FuzzyValue
-  estabilidad: FuzzyValue
-  intensidad_wifi: FuzzyValue
-  latencia: FuzzyValue
-  acceso: FuzzyValue
+  conexion: FuzzyValue // Estado de conexión (0-100%)
+  velocidad: FuzzyValue // Velocidad de carga (0-100 Mbps)
+  perdida_paquetes: FuzzyValue // Pérdida de paquetes (0-100%)
+  errores_dns: FuzzyValue // Errores DNS (0-10 por hora)
+  senal_wifi: FuzzyValue // Señal Wi-Fi (0-100%)
+  tiempo_carga: FuzzyValue // Tiempo de carga promedio (0-5000 ms)
+  latencia_servidor: FuzzyValue // Latencia de respuesta del servidor interno (0-5000 ms)
 }
 
 /**
  * Clase que implementa un sistema experto basado en lógica difusa para diagnóstico de red.
+ * Versión mejorada con correcciones de discrepancias y optimizaciones.
  */
 export class FuzzyNetworkDiagnosticSystem {
   // Mapeo de nombres de causas para la interfaz
@@ -29,6 +33,8 @@ export class FuzzyNetworkDiagnosticSystem {
     interferencia: CAUSAS_UNIFICADAS.WIFI_INTERFERENCE,
     config_incorrecta: CAUSAS_UNIFICADAS.DNS_CONFIG,
     fallo_infraestructura: CAUSAS_UNIFICADAS.INFRASTRUCTURE_FAILURE,
+    problemas_isp: CAUSAS_UNIFICADAS.ISP_PROBLEMS,
+    hardware_defectuoso: CAUSAS_UNIFICADAS.NETWORK_HARDWARE,
   }
 
   // Acciones recomendadas para cada causa
@@ -38,10 +44,20 @@ export class FuzzyNetworkDiagnosticSystem {
     interferencia: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.WIFI_INTERFERENCE],
     config_incorrecta: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.DNS_CONFIG],
     fallo_infraestructura: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.INFRASTRUCTURE_FAILURE],
+    problemas_isp: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.ISP_PROBLEMS],
+    hardware_defectuoso: ACCIONES_RECOMENDADAS[CAUSAS_UNIFICADAS.NETWORK_HARDWARE],
   }
 
   /**
-   * Función de membresía trapezoidal simplificada.
+   * Función de membresía trapezoidal.
+   * Calcula el grado de pertenencia de un valor a un conjunto difuso definido por un trapecio.
+   *
+   * @param x - Valor a evaluar
+   * @param a - Punto donde comienza a subir (0 de pertenencia)
+   * @param b - Punto donde alcanza el máximo (1 de pertenencia)
+   * @param c - Punto donde comienza a bajar (1 de pertenencia)
+   * @param d - Punto donde termina de bajar (0 de pertenencia)
+   * @returns Grado de pertenencia entre 0 y 1
    */
   private trapmf(x: number, a: number, b: number, c: number, d: number): number {
     if (x <= a) return 0
@@ -53,66 +69,145 @@ export class FuzzyNetworkDiagnosticSystem {
   }
 
   /**
-   * Evalúa las funciones de membresía para la velocidad.
+   * Función de membresía triangular.
+   * Calcula el grado de pertenencia de un valor a un conjunto difuso definido por un triángulo.
+   *
+   * @param x - Valor a evaluar
+   * @param a - Punto donde comienza a subir (0 de pertenencia)
+   * @param b - Punto máximo (1 de pertenencia)
+   * @param c - Punto donde termina de bajar (0 de pertenencia)
+   * @returns Grado de pertenencia entre 0 y 1
+   */
+  private trimf(x: number, a: number, b: number, c: number): number {
+    if (x <= a || x >= c) return 0
+    if (x === b) return 1
+    if (x > a && x < b) return (x - a) / (b - a)
+    if (x > b && x < c) return (c - x) / (c - b)
+    return 0
+  }
+
+  /**
+   * Evalúa las funciones de membresía para el estado de conexión.
+   * MEJORA: Aumentada sensibilidad en los extremos y mejor distribución.
+   *
+   * @param x - Valor del estado de conexión (0-100%)
+   * @returns Grados de pertenencia a los conjuntos difusos
+   */
+  private evaluarConexion(x: number): Record<string, number> {
+    return {
+      inexistente: this.trapmf(x, 0, 0, 15, 35),
+      intermitente: this.trimf(x, 25, 50, 75),
+      estable: this.trapmf(x, 65, 85, 100, 100),
+    }
+  }
+
+  /**
+   * Evalúa las funciones de membresía para la velocidad de carga.
+   * MEJORA: Mejor distribución de rangos.
+   *
+   * @param x - Valor de la velocidad (0-100 Mbps)
+   * @returns Grados de pertenencia a los conjuntos difusos
    */
   private evaluarVelocidad(x: number): Record<string, number> {
     return {
-      baja: this.trapmf(x, 0, 0, 5, 10),
-      media: this.trapmf(x, 5, 10, 20, 30),
-      alta: this.trapmf(x, 20, 30, 100, 100),
+      baja: this.trapmf(x, 0, 0, 15, 35),
+      media: this.trimf(x, 25, 50, 75),
+      alta: this.trapmf(x, 65, 85, 100, 100),
     }
   }
 
   /**
-   * Evalúa las funciones de membresía para la estabilidad.
+   * Evalúa las funciones de membresía para la pérdida de paquetes.
+   * MEJORA: Mejor distribución y sensibilidad.
+   *
+   * @param x - Valor de pérdida de paquetes (0-100%)
+   * @returns Grados de pertenencia a los conjuntos difusos
    */
-  private evaluarEstabilidad(x: number): Record<string, number> {
+  private evaluarPerdidaPaquetes(x: number): Record<string, number> {
     return {
-      inestable: this.trapmf(x, 0, 0, 30, 50),
-      moderada: this.trapmf(x, 30, 50, 70, 85),
-      estable: this.trapmf(x, 70, 85, 100, 100),
+      ninguna: this.trapmf(x, 0, 0, 5, 15),
+      moderada: this.trimf(x, 10, 30, 60),
+      alta: this.trapmf(x, 50, 80, 100, 100),
     }
   }
 
   /**
-   * Evalúa las funciones de membresía para la intensidad WiFi.
+   * Evalúa las funciones de membresía para los errores DNS.
+   * MEJORA: Añadida categoría "crítico" para mayor precisión.
+   *
+   * @param x - Valor de errores DNS (0-10 por hora)
+   * @returns Grados de pertenencia a los conjuntos difusos
    */
-  private evaluarIntensidadWifi(x: number): Record<string, number> {
+  private evaluarErroresDNS(x: number): Record<string, number> {
+    return {
+      ninguno: this.trapmf(x, 0, 0, 0.5, 2),
+      ocasional: this.trimf(x, 1.5, 3, 5),
+      frecuente: this.trimf(x, 4, 6, 8),
+      critico: this.trapmf(x, 7, 9, 10, 10),
+    }
+  }
+
+  /**
+   * Evalúa las funciones de membresía para la señal Wi-Fi.
+   * MEJORA: Mejor distribución de rangos.
+   *
+   * @param x - Valor de la señal Wi-Fi (0-100%)
+   * @returns Grados de pertenencia a los conjuntos difusos
+   */
+  private evaluarSenalWifi(x: number): Record<string, number> {
     return {
       debil: this.trapmf(x, 0, 0, 20, 40),
-      moderada: this.trapmf(x, 20, 40, 60, 80),
+      moderada: this.trimf(x, 30, 50, 70),
       fuerte: this.trapmf(x, 60, 80, 100, 100),
     }
   }
 
   /**
-   * Evalúa las funciones de membresía para la latencia.
+   * Evalúa las funciones de membresía para el tiempo de carga.
+   * MEJORA: Rangos refinados para mejor sensibilidad.
+   *
+   * @param x - Valor del tiempo de carga (0-5000 ms)
+   * @returns Grados de pertenencia a los conjuntos difusos
    */
-  private evaluarLatencia(x: number): Record<string, number> {
+  private evaluarTiempoCarga(x: number): Record<string, number> {
     return {
-      baja: this.trapmf(x, 0, 0, 15, 30),
-      media: this.trapmf(x, 15, 30, 80, 100),
-      alta: this.trapmf(x, 80, 100, 300, 300),
+      rapido: this.trapmf(x, 0, 0, 300, 1000),
+      moderado: this.trimf(x, 800, 2000, 3500),
+      lento: this.trapmf(x, 3000, 4000, 5000, 5000),
     }
   }
 
   /**
-   * Evalúa las funciones de membresía para el acceso a servicios.
+   * Evalúa las funciones de membresía para la latencia del servidor.
+   * MEJORA: Rangos refinados para mejor sensibilidad.
+   *
+   * @param x - Valor de la latencia (0-5000 ms)
+   * @returns Grados de pertenencia a los conjuntos difusos
    */
-  private evaluarAcceso(x: number): Record<string, number> {
+  private evaluarLatenciaServidor(x: number): Record<string, number> {
     return {
-      limitado: this.trapmf(x, 0, 0, 30, 50),
-      parcial: this.trapmf(x, 30, 50, 70, 85),
-      completo: this.trapmf(x, 70, 85, 100, 100),
+      baja: this.trapmf(x, 0, 0, 200, 800),
+      media: this.trimf(x, 600, 1500, 3000),
+      alta: this.trapmf(x, 2500, 3500, 5000, 5000),
     }
   }
 
   /**
    * Evalúa una regla difusa basada en antecedentes y consecuentes.
+   * MEJORA: Añadido factor de confianza para ponderar reglas.
+   *
+   * @param antecedentes - Valores de activación de los antecedentes
+   * @param consecuentes - Consecuentes con sus niveles de activación
+   * @param factorConfianza - Factor de confianza para la regla (1.0 por defecto)
+   * @returns Resultado de la evaluación de la regla
    */
-  private evaluarRegla(antecedentes: number[], consecuentes: Record<string, string>): Record<string, number> {
+  private evaluarRegla(
+    antecedentes: number[],
+    consecuentes: Record<string, string>,
+    factorConfianza = 1.0,
+  ): Record<string, number> {
     // Calcular el valor de activación (mínimo de todos los antecedentes)
-    const activacion = antecedentes.reduce((min, val) => Math.min(min, val), 1)
+    const activacion = antecedentes.reduce((min, val) => Math.min(min, val), 1) * factorConfianza
 
     // Aplicar la activación a cada consecuente
     const resultado: Record<string, number> = {}
@@ -124,15 +219,21 @@ export class FuzzyNetworkDiagnosticSystem {
   }
 
   /**
-   * Realiza el diagnóstico basado en los valores de entrada.
+   * Realiza el diagnóstico basado en los valores de entrada continuos.
+   * MEJORA: Implementadas todas las mejoras sugeridas.
+   *
+   * @param inputs - Valores de entrada continuos
+   * @returns Resultado del diagnóstico con causas probables, probabilidades y acciones recomendadas
    */
   public diagnose(inputs: FuzzyInputs): DiagnosisResult {
     // Evaluar funciones de membresía para cada entrada
+    const conexion = this.evaluarConexion(inputs.conexion)
     const velocidad = this.evaluarVelocidad(inputs.velocidad)
-    const estabilidad = this.evaluarEstabilidad(inputs.estabilidad)
-    const intensidad = this.evaluarIntensidadWifi(inputs.intensidad_wifi)
-    const latencia = this.evaluarLatencia(inputs.latencia)
-    const acceso = this.evaluarAcceso(inputs.acceso)
+    const perdidaPaquetes = this.evaluarPerdidaPaquetes(inputs.perdida_paquetes)
+    const erroresDNS = this.evaluarErroresDNS(inputs.errores_dns)
+    const senalWifi = this.evaluarSenalWifi(inputs.senal_wifi)
+    const tiempoCarga = this.evaluarTiempoCarga(inputs.tiempo_carga)
+    const latenciaServidor = this.evaluarLatenciaServidor(inputs.latencia_servidor)
 
     // Inicializar resultados para cada causa
     const resultados: FuzzyOutput = {
@@ -141,174 +242,336 @@ export class FuzzyNetworkDiagnosticSystem {
       interferencia: 0,
       config_incorrecta: 0,
       fallo_infraestructura: 0,
+      problemas_isp: 0,
+      hardware_defectuoso: 0,
     }
 
-    // Evaluar reglas difusas
-    // Regla 1: Si velocidad es baja Y estabilidad es inestable Y latencia es alta, entonces fallo_router es alto Y congestion es media
+    // REGLAS ORIGINALES MEJORADAS
+    // Regla 1: Si conexión es inexistente Y velocidad es baja, entonces fallo_router es alto Y problemas_isp es medio
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([velocidad.baja, estabilidad.inestable, latencia.alta], {
-        fallo_router: "alta",
-        congestion: "media",
-      }),
+      this.evaluarRegla(
+        [conexion.inexistente, velocidad.baja],
+        {
+          fallo_router: "alta",
+          problemas_isp: "media",
+        },
+        1.2,
+      ), // Factor de confianza aumentado para síntomas críticos
     )
 
-    // Regla 2: Si velocidad es baja Y estabilidad es moderada Y acceso es limitado, entonces congestion es alta Y fallo_router es media
+    // Regla 2: Si pérdida de paquetes es alta Y conexión es intermitente, entonces hardware_defectuoso es alto
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([velocidad.baja, estabilidad.moderada, acceso.limitado], {
-        congestion: "alta",
-        fallo_router: "media",
-      }),
-    )
-
-    // Regla 3: Si intensidad_wifi es debil Y estabilidad es inestable, entonces interferencia es alta Y fallo_infraestructura es media
-    this.actualizarResultados(
-      resultados,
-      this.evaluarRegla([intensidad.debil, estabilidad.inestable], {
-        interferencia: "alta",
+      this.evaluarRegla([perdidaPaquetes.alta, conexion.intermitente], {
+        hardware_defectuoso: "alta",
         fallo_infraestructura: "media",
       }),
     )
 
-    // Regla 4: Si velocidad es media Y estabilidad es inestable Y acceso es parcial, entonces config_incorrecta es media Y fallo_router es media
+    // Regla 3: Si errores DNS es frecuente Y tiempo de carga es lento, entonces config_incorrecta es alta
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([velocidad.media, estabilidad.inestable, acceso.parcial], {
-        config_incorrecta: "media",
-        fallo_router: "media",
-      }),
-    )
-
-    // Regla 5: Si intensidad_wifi es fuerte Y velocidad es baja Y latencia es alta, entonces congestion es alta Y config_incorrecta es media
-    this.actualizarResultados(
-      resultados,
-      this.evaluarRegla([intensidad.fuerte, velocidad.baja, latencia.alta], {
-        congestion: "alta",
-        config_incorrecta: "media",
-      }),
-    )
-
-    // Regla 6: Si estabilidad es inestable Y intensidad_wifi es moderada, entonces fallo_router es media Y interferencia es media
-    this.actualizarResultados(
-      resultados,
-      this.evaluarRegla([estabilidad.inestable, intensidad.moderada], {
-        fallo_router: "media",
-        interferencia: "media",
-      }),
-    )
-
-    // Regla 7: Si velocidad es baja Y estabilidad es estable Y intensidad_wifi es fuerte, entonces config_incorrecta es alta Y congestion es media
-    this.actualizarResultados(
-      resultados,
-      this.evaluarRegla([velocidad.baja, estabilidad.estable, intensidad.fuerte], {
+      this.evaluarRegla([erroresDNS.frecuente, tiempoCarga.lento], {
         config_incorrecta: "alta",
+        problemas_isp: "baja",
+      }),
+    )
+
+    // Regla 4: Si señal WiFi es débil Y conexión es intermitente, entonces interferencia es alta
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([senalWifi.debil, conexion.intermitente], {
+        interferencia: "alta",
+        fallo_router: "media",
+      }),
+    )
+
+    // Regla 5: Si tiempo de carga es lento Y velocidad es baja Y conexión es estable, entonces congestion es alta
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([tiempoCarga.lento, velocidad.baja, conexion.estable], {
+        congestion: "alta",
+        problemas_isp: "media",
+      }),
+    )
+
+    // Regla 6: Si latencia servidor es alta Y tiempo de carga es moderado, entonces fallo_infraestructura es media
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([latenciaServidor.alta, tiempoCarga.moderado], {
+        fallo_infraestructura: "media",
         congestion: "media",
       }),
     )
 
-    // Regla 8: Si velocidad es alta Y latencia es baja Y acceso es limitado, entonces config_incorrecta es alta Y fallo_router es baja
+    // Regla 7: Si errores DNS es ocasional Y conexión es estable, entonces config_incorrecta es media
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([velocidad.alta, latencia.baja, acceso.limitado], {
-        config_incorrecta: "alta",
+      this.evaluarRegla([erroresDNS.ocasional, conexion.estable], {
+        config_incorrecta: "media",
         fallo_router: "baja",
       }),
     )
 
-    // Regla 9: Si estabilidad es inestable Y intensidad_wifi es fuerte, entonces fallo_infraestructura es media Y fallo_router es media
+    // Regla 8: Si pérdida de paquetes es moderada Y velocidad es media, entonces congestion es media
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([estabilidad.inestable, intensidad.fuerte], {
-        fallo_infraestructura: "media",
-        fallo_router: "media",
+      this.evaluarRegla([perdidaPaquetes.moderada, velocidad.media], {
+        congestion: "media",
+        hardware_defectuoso: "baja",
       }),
     )
 
-    // Regla 10: Si velocidad es baja Y estabilidad es inestable Y intensidad_wifi es debil, entonces fallo_infraestructura es alta Y interferencia es alta
+    // Regla 9: Si señal WiFi es moderada Y pérdida de paquetes es moderada, entonces interferencia es media
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([velocidad.baja, estabilidad.inestable, intensidad.debil], {
+      this.evaluarRegla([senalWifi.moderada, perdidaPaquetes.moderada], {
+        interferencia: "media",
+        fallo_router: "baja",
+      }),
+    )
+
+    // Regla 10: Si conexión es inexistente Y señal WiFi es fuerte, entonces problemas_isp es alta
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla(
+        [conexion.inexistente, senalWifi.fuerte],
+        {
+          problemas_isp: "alta",
+          fallo_infraestructura: "media",
+        },
+        1.2,
+      ), // Factor de confianza aumentado para síntomas críticos
+    )
+
+    // Regla 11: Si latencia servidor es alta Y conexión es estable, entonces fallo_infraestructura es alta
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([latenciaServidor.alta, conexion.estable], {
         fallo_infraestructura: "alta",
-        interferencia: "alta",
+        congestion: "baja",
       }),
     )
 
-    // Regla 11: Si latencia es alta Y velocidad es media Y estabilidad es moderada, entonces congestion es media Y interferencia es media
+    // Regla 12: Si tiempo de carga es lento Y errores DNS es ninguno, entonces congestion es alta
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([latencia.alta, velocidad.media, estabilidad.moderada], {
-        congestion: "media",
-        interferencia: "media",
+      this.evaluarRegla([tiempoCarga.lento, erroresDNS.ninguno], {
+        congestion: "alta",
+        problemas_isp: "media",
       }),
     )
 
-    // Regla 12: Si acceso es limitado Y estabilidad es estable Y velocidad es alta, entonces fallo_router es baja Y config_incorrecta es alta
+    // Regla 13: Si errores DNS es frecuente Y conexión es intermitente, entonces config_incorrecta es alta
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([acceso.limitado, estabilidad.estable, velocidad.alta], {
-        fallo_router: "baja",
-        config_incorrecta: "alta",
-      }),
-    )
-
-    // Regla 13: Si acceso es limitado Y velocidad es media, entonces config_incorrecta es alta
-    this.actualizarResultados(
-      resultados,
-      this.evaluarRegla([acceso.limitado, velocidad.media], {
+      this.evaluarRegla([erroresDNS.frecuente, conexion.intermitente], {
         config_incorrecta: "alta",
         fallo_router: "media",
       }),
     )
 
-    // Regla 14: Si acceso es limitado Y estabilidad es moderada, entonces config_incorrecta es alta
+    // Regla 14: Si pérdida de paquetes es alta Y señal WiFi es fuerte, entonces hardware_defectuoso es alta
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([acceso.limitado, estabilidad.moderada], {
-        config_incorrecta: "alta",
+      this.evaluarRegla([perdidaPaquetes.alta, senalWifi.fuerte], {
+        hardware_defectuoso: "alta",
         fallo_infraestructura: "baja",
       }),
     )
 
-    // Regla 15: Si acceso es limitado Y latencia es media, entonces config_incorrecta es alta Y congestion es media
+    // Regla 15: Si velocidad es baja Y señal WiFi es fuerte Y pérdida de paquetes es ninguna, entonces problemas_isp es alta
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([acceso.limitado, latencia.media], {
-        config_incorrecta: "alta",
+      this.evaluarRegla([velocidad.baja, senalWifi.fuerte, perdidaPaquetes.ninguna], {
+        problemas_isp: "alta",
         congestion: "media",
       }),
     )
 
-    // Regla 16: Si acceso es limitado Y velocidad es media Y estabilidad es moderada, entonces config_incorrecta es alta
+    // Regla 16: Si latencia servidor es baja Y tiempo de carga es lento, entonces congestion es alta
     this.actualizarResultados(
       resultados,
-      this.evaluarRegla([acceso.limitado, velocidad.media, estabilidad.moderada], {
+      this.evaluarRegla([latenciaServidor.baja, tiempoCarga.lento], {
+        congestion: "alta",
+        problemas_isp: "media",
+      }),
+    )
+
+    // Regla 17: Si señal WiFi es débil Y velocidad es baja, entonces interferencia es alta
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([senalWifi.debil, velocidad.baja], {
+        interferencia: "alta",
+        fallo_router: "media",
+      }),
+    )
+
+    // Regla 18: Si conexión es intermitente Y velocidad es alta, entonces hardware_defectuoso es media
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([conexion.intermitente, velocidad.alta], {
+        hardware_defectuoso: "media",
+        interferencia: "media",
+      }),
+    )
+
+    // Regla 19: Si errores DNS es frecuente Y velocidad es alta, entonces config_incorrecta es alta
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([erroresDNS.frecuente, velocidad.alta], {
         config_incorrecta: "alta",
         fallo_router: "baja",
       }),
     )
 
-    // Caso especial para DNS
-    if (inputs.acceso <= 30 && inputs.latencia >= 50) {
-      resultados.config_incorrecta = Math.max(resultados.config_incorrecta, 0.9)
+    // Regla 20: Si latencia servidor es alta Y pérdida de paquetes es alta, entonces fallo_infraestructura es alta
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([latenciaServidor.alta, perdidaPaquetes.alta], {
+        fallo_infraestructura: "alta",
+        hardware_defectuoso: "media",
+      }),
+    )
+
+    // NUEVAS REGLAS PARA EQUILIBRAR CAUSAS Y MEJORAR CONSISTENCIA
+
+    // Regla 21: Si errores DNS es crítico, entonces config_incorrecta es alta
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla(
+        [erroresDNS.critico],
+        {
+          config_incorrecta: "alta",
+        },
+        1.3,
+      ), // Factor de confianza alto para síntoma crítico
+    )
+
+    // Regla 22: Si velocidad es baja Y perdida_paquetes es alta Y latencia_servidor es baja, entonces hardware_defectuoso es alta
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([velocidad.baja, perdidaPaquetes.alta, latenciaServidor.baja], {
+        hardware_defectuoso: "alta",
+        fallo_router: "media",
+      }),
+    )
+
+    // Regla 23: Para valores medios (escenario ambiguo)
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([conexion.intermitente, velocidad.media, perdidaPaquetes.moderada, senalWifi.moderada], {
+        congestion: "media",
+        problemas_isp: "media",
+        fallo_router: "baja",
+      }),
+    )
+
+    // Regla 24: Regla compleja para problemas_isp
+    this.actualizarResultados(
+      resultados,
+      this.evaluarRegla([conexion.intermitente, velocidad.baja, perdidaPaquetes.moderada, erroresDNS.ocasional], {
+        problemas_isp: "alta",
+        fallo_infraestructura: "media",
+      }),
+    )
+
+    // Regla 25: Si todos los síntomas son bajos excepto uno, ese síntoma es determinante
+    if (
+      inputs.conexion > 80 &&
+      inputs.velocidad > 80 &&
+      inputs.perdida_paquetes < 10 &&
+      inputs.errores_dns < 2 &&
+      inputs.senal_wifi > 80 &&
+      inputs.tiempo_carga < 500
+    ) {
+      // Solo latencia_servidor es problemática
+      if (inputs.latencia_servidor > 3000) {
+        this.actualizarResultados(
+          resultados,
+          this.evaluarRegla(
+            [latenciaServidor.alta],
+            {
+              fallo_infraestructura: "alta",
+            },
+            1.5,
+          ),
+        )
+      }
+    }
+
+    // Regla 26: Si todos los valores son medios, distribuir probabilidades equitativamente
+    const todosValoresMedios =
+      conexion.intermitente > 0.7 &&
+      velocidad.media > 0.7 &&
+      perdidaPaquetes.moderada > 0.7 &&
+      (erroresDNS.ocasional > 0.7 || erroresDNS.frecuente > 0.7) &&
+      senalWifi.moderada > 0.7 &&
+      tiempoCarga.moderado > 0.7 &&
+      latenciaServidor.media > 0.7
+
+    if (todosValoresMedios) {
+      this.actualizarResultados(resultados, {
+        congestion: 0.5,
+        fallo_router: 0.5,
+        interferencia: 0.5,
+        config_incorrecta: 0.5,
+        fallo_infraestructura: 0.5,
+        problemas_isp: 0.5,
+        hardware_defectuoso: 0.5,
+      })
+    }
+
+    // MEJORA: Normalización de resultados para evitar sesgos
+    const totalActivacion = Object.values(resultados).reduce((sum, val) => sum + val, 0)
+    if (totalActivacion > 0) {
+      for (const causa in resultados) {
+        resultados[causa] = resultados[causa] / totalActivacion
+      }
+    }
+
+    // Convertir los valores de activación a porcentajes (0-100)
+    const resultadosPorcentaje: Record<string, number> = {}
+    for (const causa in resultados) {
+      resultadosPorcentaje[causa] = Math.round(resultados[causa] * 100)
     }
 
     // Ordenar causas por nivel de activación
-    const causasOrdenadas = Object.entries(resultados)
+    const causasOrdenadas = Object.entries(resultadosPorcentaje)
       .sort((a, b) => b[1] - a[1])
-      .map(([causa, _]) => ({
+      .map(([causa, probabilidad]) => ({
         causa: this.causaLabels[causa],
         acciones: this.recomendaciones[causa],
+        probabilidad,
       }))
+
+    // MEJORA: Cálculo de certeza mejorado
+    let certeza = 100
+    if (causasOrdenadas.length >= 2) {
+      const diferencia = causasOrdenadas[0].probabilidad - causasOrdenadas[1].probabilidad
+      const sumaProbabilidades = causasOrdenadas.reduce((sum, c) => sum + c.probabilidad, 0)
+      const dispersion =
+        causasOrdenadas.reduce(
+          (sum, c) => sum + Math.abs(c.probabilidad - sumaProbabilidades / causasOrdenadas.length),
+          0,
+        ) / causasOrdenadas.length
+
+      certeza = Math.max(60, causasOrdenadas[0].probabilidad - (dispersion > 20 ? 0 : 20 - dispersion))
+    }
 
     return {
       causas: causasOrdenadas,
+      certeza,
     }
   }
 
   /**
    * Actualiza los resultados con los valores de una regla.
    * Utiliza el máximo para combinar resultados.
+   *
+   * @param resultados - Resultados actuales
+   * @param nuevosResultados - Nuevos resultados a combinar
    */
   private actualizarResultados(resultados: FuzzyOutput, nuevosResultados: FuzzyOutput): void {
     for (const causa in nuevosResultados) {
@@ -317,55 +580,20 @@ export class FuzzyNetworkDiagnosticSystem {
   }
 
   /**
-   * Convierte valores de síntomas de la interfaz a valores para el sistema difuso.
+   * Convierte los valores de entrada continuos a un objeto FuzzyInputs.
+   *
+   * @param valores - Valores de entrada desde la interfaz
+   * @returns Objeto FuzzyInputs con los valores normalizados
    */
-  public convertirSintomasAEntradas(sintomas: string[]): FuzzyInputs {
-    // Valores por defecto
-    const inputs: FuzzyInputs = {
-      velocidad: 50,
-      estabilidad: 50,
-      intensidad_wifi: 50,
-      latencia: 50,
-      acceso: 50,
+  public convertirValoresAEntradas(valores: Record<string, number>): FuzzyInputs {
+    return {
+      conexion: valores.conexion || 0,
+      velocidad: valores.velocidad || 0,
+      perdida_paquetes: valores.perdida_paquetes || 0,
+      errores_dns: valores.errores_dns || 0,
+      senal_wifi: valores.senal_wifi || 0,
+      tiempo_carga: valores.tiempo_carga || 0,
+      latencia_servidor: valores.latencia_servidor || 0,
     }
-
-    // Ajustar valores según los síntomas seleccionados
-    if (sintomas.includes(SINTOMAS_UNIFICADOS.NO_INTERNET)) {
-      inputs.velocidad = 0
-      inputs.acceso = 0
-    }
-
-    if (sintomas.includes(SINTOMAS_UNIFICADOS.PACKET_LOSS)) {
-      inputs.estabilidad = 20
-      inputs.latencia = 150
-    }
-
-    if (sintomas.includes(SINTOMAS_UNIFICADOS.DNS_ERROR)) {
-      inputs.acceso = 20
-      inputs.velocidad = 30
-      inputs.estabilidad = 40
-      inputs.latencia = 70
-    }
-
-    if (sintomas.includes(SINTOMAS_UNIFICADOS.SLOW_LOADING)) {
-      inputs.velocidad = 20
-      inputs.latencia = 120
-    }
-
-    if (sintomas.includes(SINTOMAS_UNIFICADOS.WEAK_WIFI)) {
-      inputs.intensidad_wifi = 15
-    }
-
-    if (sintomas.includes(SINTOMAS_UNIFICADOS.INTERMITTENT)) {
-      inputs.estabilidad = 25
-    }
-
-    if (sintomas.includes(SINTOMAS_UNIFICADOS.SLOW_INTERNAL)) {
-      inputs.velocidad = 30
-      inputs.latencia = 100
-      inputs.acceso = 40
-    }
-
-    return inputs
   }
 }
