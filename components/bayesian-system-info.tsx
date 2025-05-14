@@ -206,7 +206,7 @@ export function BayesianSystemInfo() {
                           <strong>A</strong> - Ambiente
                         </td>
                         <td className="border border-gray-300 px-4 py-2">
-                          <p className="mb-1">Red empresarial con relaciones probabilísticas entre:</p>
+                          <p className="mb-1">Servidores de Vercel con relaciones probabilísticas entre:</p>
                           <ul className="list-disc pl-5">
                             <li>Síntomas observables (7 tipos de síntomas unificados)</li>
                             <li>Causas subyacentes (9 tipos de causas unificadas)</li>

@@ -189,20 +189,12 @@ export function DecisionTreeDiagram({
   open?: boolean
   onOpenChange?: (value: boolean) => void
 }) {
-  const [selectedNode, setSelectedNode] = useState<DecisionNode | null>(null)
-  const [hoveredNode, setHoveredNode] = useState<DecisionNode | null>(null)
-  const [hoveredLink, setHoveredLink] = useState<{
-    from: string
-    to: string
-    condition: string
-    probability: number
-  } | null>(null)
-
   // Estado para el zoom
   const [zoomLevel, setZoomLevel] = useState(1)
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Función para aumentar el zoom
   const zoomIn = () => {
@@ -220,6 +212,47 @@ export function DecisionTreeDiagram({
     setPanOffset({ x: 0, y: 0 })
   }
 
+  // Función para manejar el inicio del arrastre
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return // Solo botón izquierdo
+    setIsDragging(true)
+    setDragStart({ x: e.clientX, y: e.clientY })
+  }
+
+  // Función para manejar el movimiento durante el arrastre
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging) return
+
+    const dx = e.clientX - dragStart.x
+    const dy = e.clientY - dragStart.y
+
+    setPanOffset({
+      x: panOffset.x + dx,
+      y: panOffset.y + dy,
+    })
+
+    setDragStart({ x: e.clientX, y: e.clientY })
+  }
+
+  // Función para manejar el fin del arrastre
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  // Función para manejar la rueda del ratón para zoom
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault()
+
+    // Determinar la dirección del zoom
+    const delta = e.deltaY < 0 ? 0.1 : -0.1
+
+    // Calcular el nuevo nivel de zoom
+    const newZoom = Math.max(0.5, Math.min(3, zoomLevel + delta))
+
+    // Actualizar el zoom
+    setZoomLevel(newZoom)
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
@@ -229,7 +262,7 @@ export function DecisionTreeDiagram({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
           <div className="md:col-span-2">
-            <div className="border rounded-lg p-4 bg-white h-[600px] relative">
+            <div className="border rounded-lg p-4 bg-white h-[600px] relative overflow-hidden">
               {/* Controles de zoom */}
               <div className="absolute top-2 right-2 z-20 flex flex-col gap-2 bg-white/80 p-1 rounded-md shadow-sm">
                 <Button variant="outline" size="icon" onClick={zoomIn} title="Acercar" className="h-8 w-8">
@@ -248,50 +281,36 @@ export function DecisionTreeDiagram({
                 Zoom: {Math.round(zoomLevel * 100)}%
               </div>
 
-              <DecisionTreeGraph
-                tree={decisionTree}
-                onNodeHover={setHoveredNode}
-                onLinkHover={setHoveredLink}
-                onNodeClick={(node) => {
-                  if (node.type === "result") {
-                    setSelectedNode(node)
-                  }
-                }}
-                zoomLevel={zoomLevel}
-                panOffset={panOffset}
-                setPanOffset={setPanOffset}
-                isDragging={isDragging}
-                setIsDragging={setIsDragging}
-                dragStart={dragStart}
-                setDragStart={setDragStart}
-                setZoomLevel={setZoomLevel}
-              />
-
-              {/* Información sobre nodo al hacer hover */}
-              {hoveredNode && (
-                <div className="absolute top-2 left-2 bg-white p-2 border rounded shadow-md z-10">
-                  <h4 className="font-medium">{hoveredNode.text}</h4>
-                  {hoveredNode.type === "result" && (
-                    <p className="text-sm">Probabilidad: {(hoveredNode.probability || 0).toFixed(2) * 100}%</p>
-                  )}
-                  <p className="text-xs text-gray-500">
-                    {hoveredNode.type === "decision"
-                      ? "Punto de decisión"
-                      : hoveredNode.type === "result"
-                        ? "Diagnóstico final"
-                        : "Inicio"}
-                  </p>
+              {/* Contenedor para la imagen con zoom y pan */}
+              <div
+                ref={containerRef}
+                className="w-full h-full cursor-grab active:cursor-grabbing overflow-hidden"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onWheel={handleWheel}
+              >
+                <div
+                  style={{
+                    transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
+                    transformOrigin: "center",
+                    transition: isDragging ? "none" : "transform 0.1s ease-out",
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <img
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-1KNe2lkIbrLuxgLCAanUJ1vecbarmA.png"
+                    alt="Árbol de decisión para diagnóstico de red"
+                    className="max-w-full max-h-full object-contain"
+                    style={{ pointerEvents: "none" }} // Evita problemas con el arrastre
+                  />
                 </div>
-              )}
-
-              {/* Información sobre enlace al hacer hover */}
-              {hoveredLink && (
-                <div className="absolute top-2 left-40 bg-white p-2 border rounded shadow-md z-10">
-                  <h4 className="font-medium">Transición</h4>
-                  <p className="text-sm">Condición: {hoveredLink.condition}</p>
-                  <p className="text-sm">Probabilidad: {(hoveredLink.probability * 100).toFixed(0)}%</p>
-                </div>
-              )}
+              </div>
             </div>
 
             {/* Leyenda */}
@@ -300,37 +319,39 @@ export function DecisionTreeDiagram({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center mb-2">
-                    <div className="w-4 h-4 rounded-full bg-[#4A86E8] mr-2"></div>
-                    <span className="text-sm">Nodo de inicio</span>
+                    <div className="w-4 h-4 rounded-md border border-blue-500 mr-2"></div>
+                    <span className="text-sm">Nodo de decisión</span>
                   </div>
                   <div className="flex items-center mb-2">
-                    <div className="w-4 h-4 rotate-45 bg-[#F1C232] mr-2"></div>
-                    <span className="text-sm">Punto de decisión</span>
+                    <div className="w-4 h-4 rounded-md border border-red-500 mr-2"></div>
+                    <span className="text-sm">Nodo de decisión crítico</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-4 h-4 rounded-sm bg-[#6AA84F] mr-2"></div>
+                    <div className="w-4 h-4 rounded-md bg-white border border-gray-500 mr-2"></div>
                     <span className="text-sm">Acción recomendada</span>
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm mb-1">Grosor de línea:</div>
-                  <div className="flex items-center">
+                  <div className="text-sm mb-1">Conexiones:</div>
+                  <div className="flex items-center mb-1">
                     <div className="h-[1px] w-10 bg-[#555555] mr-2"></div>
-                    <span className="text-xs">Probabilidad baja (&lt;40%)</span>
+                    <span className="text-xs">Flujo de decisión</span>
+                  </div>
+                  <div className="flex items-center mb-1">
+                    <span className="text-xs mr-2">Sí</span>
+                    <div className="h-[1px] w-10 bg-[#555555]"></div>
+                    <span className="text-xs ml-2">Respuesta afirmativa</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="h-[2px] w-10 bg-[#555555] mr-2"></div>
-                    <span className="text-xs">Probabilidad media (40-70%)</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="h-[3px] w-10 bg-[#555555] mr-2"></div>
-                    <span className="text-xs">Probabilidad alta (&gt;70%)</span>
+                    <span className="text-xs mr-2">No</span>
+                    <div className="h-[1px] w-10 bg-[#555555]"></div>
+                    <span className="text-xs ml-2">Respuesta negativa</span>
                   </div>
                 </div>
               </div>
               <div className="mt-2 text-xs text-gray-600">
-                <p>• Utiliza los controles de zoom o arrastra para navegar por el diagrama</p>
-                <p>• Haz clic en un diagnóstico final para ver sus detalles en el panel lateral</p>
+                <p>• Utiliza los controles de zoom o la rueda del ratón para acercar/alejar</p>
+                <p>• Arrastra para navegar por el diagrama cuando está ampliado</p>
               </div>
             </div>
           </div>
@@ -340,49 +361,32 @@ export function DecisionTreeDiagram({
             <Card className="p-4 h-full">
               <h3 className="font-medium mb-4">Información del Diagnóstico</h3>
 
-              {selectedNode && selectedNode.type === "result" ? (
-                <div>
-                  <h4 className="font-medium text-[#6AA84F] mb-2">{selectedNode.text}</h4>
-                  <p className="text-sm mb-2">Probabilidad: {(selectedNode.probability || 0) * 100}%</p>
+              <div>
+                <p className="text-sm text-gray-600 mb-4">
+                  Este árbol de decisión ilustra el proceso de diagnóstico de problemas de red que implementa el sistema
+                  experto basado en reglas.
+                </p>
 
-                  <h5 className="font-medium mt-4 mb-2">Acciones Recomendadas:</h5>
-                  <ul className="space-y-1 text-sm">
-                    {selectedNode.actions?.map((accion, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className="inline-block w-2 h-2 bg-[#6AA84F] rounded-full mr-2 mt-1.5"></span>
-                        {accion}
-                      </li>
-                    ))}
-                  </ul>
+                <h4 className="font-medium mb-2">Cómo Interpretar</h4>
+                <ul className="text-sm text-gray-600 space-y-2">
+                  <li>• Los rectángulos con borde azul/rojo representan preguntas sobre síntomas</li>
+                  <li>• Los rectángulos con borde simple son acciones recomendadas</li>
+                  <li>• Siga las flechas según las respuestas a cada pregunta</li>
+                  <li>• Las etiquetas "Sí" y "No" indican qué camino seguir</li>
+                </ul>
 
-                  <h5 className="font-medium mt-4 mb-2">Regla de Decisión:</h5>
-                  <div className="text-sm p-3 bg-gray-100 rounded-md font-mono">
-                    SI [Síntoma = {getDecisionPath(decisionTree, selectedNode.id).join("] Y [")}] ENTONCES [
-                    {selectedNode.text}]
-                  </div>
+                <h4 className="font-medium mt-4 mb-2">Sobre el Sistema Basado en Reglas</h4>
+                <p className="text-sm text-gray-600">
+                  El sistema experto basado en reglas implementa este árbol de decisión mediante un conjunto de reglas
+                  SI-ENTONCES. Cada regla evalúa los síntomas seleccionados y determina las causas más probables del
+                  problema de red.
+                </p>
+
+                <h4 className="font-medium mt-4 mb-2">Ejemplo de Regla</h4>
+                <div className="text-sm p-3 bg-gray-100 rounded-md font-mono">
+                  SI [Sin conexión a Internet] Y [Ping falla] ENTONCES [Reiniciar router]
                 </div>
-              ) : (
-                <div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Selecciona un nodo de acción recomendada para ver sus detalles.
-                  </p>
-
-                  <h4 className="font-medium mb-2">Sobre el Árbol de Decisión</h4>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Este árbol representa el proceso de diagnóstico mediante reglas SI-ENTONCES. Cada diamante es una
-                    pregunta sobre un síntoma, y las respuestas conducen a diferentes ramas hasta llegar a una acción
-                    recomendada.
-                  </p>
-
-                  <h4 className="font-medium mb-2">Cómo Interpretar</h4>
-                  <ul className="text-sm text-gray-600 space-y-2">
-                    <li>• Los diamantes amarillos representan preguntas sobre síntomas</li>
-                    <li>• Los rectángulos verdes son acciones recomendadas</li>
-                    <li>• El grosor de las líneas indica la probabilidad de esa transición</li>
-                    <li>• Haz clic en una acción recomendada para ver la regla completa</li>
-                  </ul>
-                </div>
-              )}
+              </div>
             </Card>
           </div>
         </div>
@@ -390,7 +394,6 @@ export function DecisionTreeDiagram({
     </Dialog>
   )
 }
-
 // Función para obtener la ruta de decisión hasta un nodo resultado
 function getDecisionPath(tree: DecisionNode[], resultId: string): string[] {
   const path: string[] = []

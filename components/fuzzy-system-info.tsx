@@ -239,7 +239,7 @@ export function FuzzySystemInfo() {
                           <strong>A</strong> - Ambiente
                         </td>
                         <td className="border border-gray-300 px-4 py-2">
-                          <p className="mb-2">Sistema de red con variables continuas:</p>
+                          <p className="mb-2">Servidores de Vercel con variables continuas:</p>
                           <ul className="list-disc pl-5 mb-2">
                             <li>Métricas de rendimiento (velocidad, latencia)</li>
                             <li>Métricas de calidad (estabilidad, intensidad de señal)</li>

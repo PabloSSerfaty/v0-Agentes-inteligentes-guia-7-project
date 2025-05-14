@@ -204,7 +204,7 @@ export function ExpertSystemInfo() {
                           <strong>A</strong> - Ambiente
                         </td>
                         <td className="border border-gray-300 px-4 py-2">
-                          <p className="mb-1">Sistema de red empresarial con múltiples componentes:</p>
+                          <p className="mb-1">Servidores de Vercel con acceso a:</p>
                           <ul className="list-disc pl-5">
                             <li>Infraestructura física (routers, switches, cables)</li>
                             <li>Servicios de red (DNS, servidores internos)</li>
